@@ -107,40 +107,56 @@ jobs:
         id: tag
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Generate Release Notes with Checksums
-        id: release_notes
+      - name: Generate Release Notes
         run: |
           TAG="${{ steps.tag.outputs.TAG }}"
           REPO="${{ github.repository }}"
           CHANGELOG_URL="https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md"
+          ASSET_BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 
           cat << EOF > release-body.md
-          > 📋 **[View full Changelog](${CHANGELOG_URL})**
+          > **[View full Changelog](${CHANGELOG_URL})**
 
           ## Download
 
           Choose the file that matches your platform and preferred install method:
 
-          | Platform | File pattern | Description |
+          | Platform | Download | Description |
           | --- | --- | --- |
-          | 🪟 Windows | \`*-portable.exe\` | Portable app — download and run directly, no installation needed |
-          | 🪟 Windows | \`*-setup.exe\` | Installer — installs QuotaShift to your system |
-          | 🍎 macOS | \`*.dmg\` | Disk image installer for macOS |
-          | 🐧 Linux | \`*.deb\` | Debian/Ubuntu package |
-          | 🐧 Linux | \`*.AppImage\` | Portable Linux app (run on any distro) |
-
-          ## SHA-256 Checksums
-
-          | File | SHA-256 |
-          | --- | --- |
           EOF
 
           cd release-assets
           for file in *; do
-            if [ -f "$file" ]; then
-              sha256=$(sha256sum "$file" | cut -d' ' -f1)
-              echo "| \`$file\` | \`$sha256\` |" >> ../release-body.md
-            fi
+            [ -f "$file" ] || continue
+
+            case "$file" in
+              *-portable.exe)
+                platform="Windows"
+                description="Portable app — download and run directly, no installation needed"
+                ;;
+              *-setup.exe)
+                platform="Windows"
+                description="Installer — installs QuotaShift to your system"
+                ;;
+              *.dmg)
+                platform="macOS"
+                description="Disk image installer for macOS"
+                ;;
+              *.deb)
+                platform="Linux"
+                description="Debian/Ubuntu package"
+                ;;
+              *.AppImage)
+                platform="Linux"
+                description="Portable Linux app (run on any distro)"
+                ;;
+              *)
+                continue
+                ;;
+            esac
+
+            encoded_file=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$file")
+            echo "| ${platform} | [\`${file}\`](${ASSET_BASE_URL}/${encoded_file}) | ${description} |" >> ../release-body.md
           done
 
       - name: Create GitHub Release
