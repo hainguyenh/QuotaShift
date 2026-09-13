@@ -5,7 +5,7 @@ import { formatLastUsed } from "../../utils/account/account-last-used";
 import { aggregateCloudQuotasIntoPools } from "../../utils/antigravity/antigravity-quota";
 import { resolveAntigravityPlanName } from "../../App";
 import { formatCompactTierName } from "../../utils/common/card-layout-mode";
-import { canAddLocalSessionToMonitored, createEmptyLocalAntigravitySession } from "../../utils/antigravity/local-antigravity-session";
+import { canAddLocalSessionToMonitored, createEmptyLocalAntigravitySession, resolveLocalSessionDisplayQuotas } from "../../utils/antigravity/local-antigravity-session";
 import { computeAntigravityTierSummary } from "../../utils/antigravity/antigravity-tier-summary";
 import { AntigravityQuotaRows } from "./AntigravityQuotaRows";
 import { AntigravityAccountActions } from "./AntigravityAccountActions";
@@ -48,6 +48,12 @@ export const AntigravityTab: React.FC<AntigravityTabProps> = ({
     }
     return appliedId && accounts.some((a) => a.id === appliedId) ? appliedId : null;
   }, [accounts, localSession, appliedId]);
+
+  const matchedLocalAccount = useMemo(() => currentLocalSessionAccountId ? accounts.find((a) => a.id === currentLocalSessionAccountId) : null, [accounts, currentLocalSessionAccountId]);
+  const localCache = currentLocalSessionAccountId ? antigravityUsageCache[currentLocalSessionAccountId] : null;
+  const localDisplayQuotas = useMemo(() => resolveLocalSessionDisplayQuotas(rawLocalSession?.quotas, localCache?.cloudQuotas ? aggregateCloudQuotasIntoPools(localCache.cloudQuotas) : [], localCache?.quotas, matchedLocalAccount?.quotas, matchedLocalAccount?.cloudQuotas ? aggregateCloudQuotasIntoPools(matchedLocalAccount.cloudQuotas) : [], localCache?.accuracy === "exact_grouped"), [rawLocalSession?.quotas, localCache, matchedLocalAccount]);
+  const localDisplayPlan = resolveAntigravityPlanName(rawLocalSession?.planTier) || resolveAntigravityPlanName(localCache?.planTier) || matchedLocalAccount?.lastPlan || "Local profile";
+  const isLocalSessionActive = Boolean(localSession.online || (localSession.email && (localDisplayQuotas.length > 0 || localSession.quotas.length > 0)));
   const { editingId, editingValue, setEditingValue, handleStartRename, handleRenameSave, handleRenameKeyDown } = useAccountRename(onRename);
   const isFiltered = Boolean((searchQuery || "").trim());
   const filteredAccounts = useMemo(() => filterAccountsByQuery(accounts, searchQuery), [accounts, searchQuery]);
@@ -136,14 +142,8 @@ export const AntigravityTab: React.FC<AntigravityTabProps> = ({
             <button type="button" className="account-action-btn account-action-btn--icon-only" onClick={onTrackCurrentAccount} disabled={isTrackingCurrentAccount} aria-label="Track Current Account" data-tooltip="Track the account currently active in the local Antigravity session"><TrackCurrentAccountIcon /></button>
           )}
           {accounts.length >= 2 && (
-            <button
-              className="account-action-btn"
-              onClick={onSwitchBest}
-              data-tooltip="Auto-switch to the Antigravity account with the highest remaining quota"
-            >
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="10" height="10">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-              </svg>
+            <button className="account-action-btn" onClick={onSwitchBest} data-tooltip="Auto-switch to the Antigravity account with the highest remaining quota">
+              <svg viewBox="0 0 24 24" fill="none" width="10" height="10"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /></svg>
               Best
             </button>
           )}
@@ -159,10 +159,13 @@ export const AntigravityTab: React.FC<AntigravityTabProps> = ({
           <div className="account-card local-session-card" style={{ cursor: "default", marginRight: "6px", marginBottom: "10px" }}>
             <div className="codex-card-header">
               <div className="codex-card-title-wrap" style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "6px" }}>
-                <div className={`local-session-status-dot ${localSession.online ? "local-session-status-dot--online" : ""}`} />
+                <div className={`local-session-status-dot ${isLocalSessionActive ? "local-session-status-dot--online" : ""}`} data-tooltip={isLocalSessionActive ? "Local session active" : "Local session offline"} />
                 <span className="codex-label-text" style={{ fontWeight: 700 }}>Local Antigravity Session</span>
               </div>
               <div className="codex-card-header-actions" style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                {matchedLocalAccount && (
+                  <button type="button" className={`codex-card-refresh-btn${localCache?.loading ? " spinning" : ""}`} onClick={(e) => { e.stopPropagation(); onRefreshQuota(matchedLocalAccount); }} disabled={localCache?.loading} data-tooltip="Refresh quota for this local session" aria-label="Refresh quota for local session"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 018-8 8 8 0 016.93 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M18 4l2 4-4-.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M6 20l-2-4 4 .5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+                )}
                 {canAddLocalSessionToMonitored(localSession, accounts) && (
                   <button className="card-apply-btn local-session-add-btn" onClick={onAddLocalSessionToMonitored} data-tooltip="Copy this protected local session into the monitored account list">
                     <svg viewBox="0 0 24 24" fill="none" width="11" height="11" aria-hidden="true">
@@ -177,8 +180,8 @@ export const AntigravityTab: React.FC<AntigravityTabProps> = ({
             <div className="codex-card-info" style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", marginTop: "4px" }}>
               <div className="codex-card-plan-wrap" style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, flex: 1 }}>
                 <div className="codex-card-plan" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
-                  <span className="plan-full">{resolveAntigravityPlanName(localSession.planTier) || "Local profile"}</span>
-                  <span className="plan-compact">{formatCompactTierName(resolveAntigravityPlanName(localSession.planTier) || "Local profile")}</span>
+                  <span className="plan-full">{localDisplayPlan}</span>
+                  <span className="plan-compact">{formatCompactTierName(localDisplayPlan)}</span>
                 </div>
                 {localSession.email && (
                   <>
@@ -197,13 +200,13 @@ export const AntigravityTab: React.FC<AntigravityTabProps> = ({
                   </>
                 )}
               </div>
-              {!localSession.online && localSession.lastSeenAt && (
+              {!isLocalSessionActive && localSession.lastSeenAt && (
                 <div className="codex-card-meta" style={{ flexShrink: 0, whiteSpace: "nowrap", marginLeft: "8px" }}>
                   Last seen {new Date(localSession.lastSeenAt).toLocaleString()}
                 </div>
               )}
             </div>
-            <AntigravityQuotaRows quotas={localSession.quotas} />
+            <AntigravityQuotaRows quotas={localDisplayQuotas} />
           </div>
 
           {accounts.length === 0 && (

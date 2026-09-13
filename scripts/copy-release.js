@@ -36,7 +36,7 @@ if (fs.existsSync(srcBinary)) {
 // 2. Find and copy the installer package
 const bundleDir = path.join(tauriReleaseDir, 'bundle');
 if (fs.existsSync(bundleDir)) {
-  const formats = ['nsis', 'deb', 'appimage'];
+  const formats = ['nsis', 'deb', 'appimage', 'dmg', 'macos'];
   for (const format of formats) {
     const formatDir = path.join(bundleDir, format);
     if (fs.existsSync(formatDir)) {

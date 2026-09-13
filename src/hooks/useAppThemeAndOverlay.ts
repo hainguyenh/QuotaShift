@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, emit } from "@tauri-apps/api/event";
 import { THEME_KEY, KEEP_ALIVE_KEY, OVERLAY_ENABLED_KEY } from "../utils/common/app-constants";
 
 export const useAppThemeAndOverlay = () => {
@@ -12,6 +13,16 @@ export const useAppThemeAndOverlay = () => {
   useEffect(() => {
     const saved = localStorage.getItem(THEME_KEY) || "dark";
     document.documentElement.setAttribute("data-theme", saved);
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<boolean>("overlay-visibility-changed", (event) => {
+      if (typeof event.payload === "boolean") {
+        setOverlayEnabled(event.payload);
+      }
+    }).then((u) => { unlisten = u; }).catch(() => {});
+    return () => { unlisten?.(); };
   }, []);
 
   const handleToggleTheme = () => {
@@ -38,7 +49,12 @@ export const useAppThemeAndOverlay = () => {
     const next = !overlayEnabled;
     setOverlayEnabled(next);
     localStorage.setItem(OVERLAY_ENABLED_KEY, String(next));
-    await invoke("set_overlay_visible", { visible: next });
+    try {
+      await emit("overlay-visibility-changed", next);
+      await invoke("set_overlay_visible", { visible: next });
+    } catch (e) {
+      console.warn("Toggle overlay failed:", e);
+    }
   };
 
   return {

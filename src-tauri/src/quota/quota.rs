@@ -153,7 +153,7 @@ pub(crate) async fn fetch_full_status_internal() -> Result<FullStatus, String> {
     for proc in procs {
         let ports = scan_ports(proc.pid);
         for port in ports {
-            let mut raw_data_opt = query_server_https(
+            let https_res = query_server_https(
                 port,
                 &proc.token,
                 "/exa.language_server_pb.LanguageServerService/GetUserStatus",
@@ -164,20 +164,23 @@ pub(crate) async fn fetch_full_status_internal() -> Result<FullStatus, String> {
                     "ideVersion": "unknown"
                 }),
             )
-            .await
-            .ok();
+            .await;
 
-            let mut is_http = false;
-            if raw_data_opt.is_none() {
-                raw_data_opt = query_server(
-                    port,
-                    &proc.token,
-                    "/exa.language_server_pb.LanguageServerService/GetUserStatus",
-                )
-                .await
-                .ok();
-                is_http = raw_data_opt.is_some();
-            }
+            let (raw_data_opt, is_http) = match https_res {
+                Ok(data) => (Some(data), false),
+                Err(e) if e.starts_with("APP_ERR:") => (None, false),
+                Err(_) => {
+                    let http_data = query_server(
+                        port,
+                        &proc.token,
+                        "/exa.language_server_pb.LanguageServerService/GetUserStatus",
+                    )
+                    .await
+                    .ok();
+                    let is_h = http_data.is_some();
+                    (http_data, is_h)
+                }
+            };
 
             if let Some(raw_data) = raw_data_opt {
                 let raw_quota_summary = if is_http {

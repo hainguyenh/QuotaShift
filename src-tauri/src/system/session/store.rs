@@ -161,10 +161,9 @@ pub async fn read_antigravity_session() -> Result<Value, String> {
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     if let Ok(val) = serde_json::from_str::<Value>(stdout_str.trim()) {
         if let Some(obj) = val.as_object() {
-            for (k, v) in obj {
-                if !result_map.contains_key(k) {
-                    result_map.insert(k.clone(), v.clone());
-                }
+            let has_vscdb_token = obj.contains_key("antigravityUnifiedStateSync.oauthToken");
+            if has_vscdb_token {
+                result_map = obj.clone();
             }
         }
     }
@@ -185,10 +184,13 @@ pub async fn read_antigravity_session() -> Result<Value, String> {
             let adc_stdout = String::from_utf8_lossy(&output.stdout);
             if let Ok(val) = serde_json::from_str::<Value>(adc_stdout.trim()) {
                 if let Some(obj) = val.as_object() {
-                    for (k, v) in obj {
-                        if !result_map.contains_key(k) {
-                            result_map.insert(k.clone(), v.clone());
-                        }
+                    let map_mtime = result_map.get("_mtime").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let adc_mtime = obj.get("_mtime").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let has_adc_token = obj.contains_key("antigravityUnifiedStateSync.oauthToken") || obj.contains_key("antigravity.refreshToken");
+                    let has_map_token = result_map.contains_key("antigravityUnifiedStateSync.oauthToken");
+
+                    if has_adc_token && (adc_mtime > map_mtime || !has_map_token) {
+                        result_map = obj.clone();
                     }
                 }
             }

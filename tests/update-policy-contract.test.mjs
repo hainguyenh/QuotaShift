@@ -29,3 +29,12 @@ test("the update opener is restricted to the HTTPS QuotaShift release page", () 
   assert.doesNotMatch(app, /openUrl\([^)]*releaseData/);
   assert.doesNotMatch(app, /openUrl\([^)]*browser_download_url/);
 });
+
+test("download new version button triggers backup recommendation dialog with I'll backup now and Download new version", () => {
+  assert.match(app, /setUpdatePromptOpen\(true\)/);
+  assert.match(app, /cancelText="I'll backup now"/);
+  assert.match(app, /confirmText="Download new version"/);
+  assert.match(app, /handleExportBackup\(\)/);
+  assert.match(app, /openUrl\(OFFICIAL_RELEASE_URL\)/);
+});
+

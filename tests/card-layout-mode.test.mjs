@@ -133,6 +133,7 @@ test("ModelLogos exports GeminiLogo, OpenAILogo, ClaudeOpenAIDualLogo, and Model
   assert.match(code, /export const OpenAILogo/);
   assert.match(code, /export const ClaudeOpenAIDualLogo/);
   assert.match(code, /export const ModelPoolIcon/);
+  assert.match(code, /if\s*\(!model\s*\|\|\s*typeof\s+model\s*!==\s*["']string["']\)/);
   assert.match(code, /viewBox="0 0 28 28"/);
   assert.match(code, /viewBox="0 0 512 512"/);
 });

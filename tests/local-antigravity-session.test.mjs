@@ -97,3 +97,26 @@ test('loadLocalAntigravitySession and saveLocalAntigravitySession persist to loc
     delete globalThis.localStorage;
   }
 });
+
+test('resolveLocalSessionDisplayQuotas prefers raw quotas when available', async () => {
+  const { resolveLocalSessionDisplayQuotas } = await import('../.test-build/local-antigravity-session.js');
+  const raw = [{ model: 'Gemini Models', percent: 80 }];
+  const cloud = [{ model: 'Gemini Models', percent: 20 }];
+  const result = resolveLocalSessionDisplayQuotas(raw, cloud, [], [], [], true);
+  assert.deepEqual(result, raw);
+});
+
+test('resolveLocalSessionDisplayQuotas falls back to cached cloud quotas when raw is empty', async () => {
+  const { resolveLocalSessionDisplayQuotas } = await import('../.test-build/local-antigravity-session.js');
+  const cloud = [{ model: 'Claude & OpenAI Models', percent: 65, weeklyPercent: 30 }];
+  const result = resolveLocalSessionDisplayQuotas([], cloud, [], [], [], true);
+  assert.deepEqual(result, cloud);
+});
+
+test('resolveLocalSessionDisplayQuotas falls back to account quotas or returns empty array when none available', async () => {
+  const { resolveLocalSessionDisplayQuotas } = await import('../.test-build/local-antigravity-session.js');
+  const accountQuotas = [{ model: 'Gemini Models', percent: 50 }];
+  assert.deepEqual(resolveLocalSessionDisplayQuotas([], [], [], accountQuotas, [], false), accountQuotas);
+  assert.deepEqual(resolveLocalSessionDisplayQuotas([], [], [], [], [], false), []);
+});
+

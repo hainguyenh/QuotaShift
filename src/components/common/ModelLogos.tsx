@@ -7,6 +7,24 @@ export interface LogoProps {
   fill?: string;
 }
 
+export const AntigravityLogo: React.FC<LogoProps> = ({
+  size = 12,
+  className,
+  fill = "currentColor",
+}) => (
+  <svg
+    width={size}
+    height={size}
+    className={className}
+    viewBox="0 0 540 540"
+    fill={fill}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M265,84L282,85L293,88L305,94L320,106L330,118L339,132L348,150L359,178L368,206L394,300L411,348L418,362L418,364L432,390L447,411L464,429L469,438L470,443L468,449L463,453L449,454L436,449L418,436L399,418L382,397L368,376L339,326L326,309L313,297L298,288L289,285L273,283L261,283L246,286L225,297L209,313L200,325L169,378L151,404L141,416L119,437L99,451L85,455L79,455L71,452L67,445L69,437L74,429L93,409L107,389L124,356L143,304L143,301L147,291L147,288L157,256L158,249L164,231L167,217L180,176L189,153L200,131L213,112L230,96L243,89L252,86L264,85L265,84Z" />
+  </svg>
+);
+
 export const GeminiLogo: React.FC<LogoProps> = ({
   size = 13,
   className,
@@ -93,11 +111,14 @@ export const ClaudeOpenAIDualLogo: React.FC<{
 );
 
 export const ModelPoolIcon: React.FC<{
-  model: string;
+  model?: string | null;
   size?: number;
   className?: string;
   fill?: string;
 }> = ({ model, size = 13, className, fill }) => {
+  if (!model || typeof model !== "string") {
+    return <span className={className}>-</span>;
+  }
   const m = model.toLowerCase();
   if (m.includes("gemini")) {
     return <GeminiLogo size={size} className={className} fill={fill} />;

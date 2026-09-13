@@ -128,6 +128,7 @@ pub async fn query_exact_server(
     .await;
     let (user_status, use_https) = match https_status {
         Ok(value) => (value, true),
+        Err(e) if e.starts_with("APP_ERR:") => return Err(e),
         Err(_) => (
             query_server(
                 port,

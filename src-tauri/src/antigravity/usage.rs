@@ -89,7 +89,10 @@ async fn fetch_usage_with_token(
     // Current Antigravity builds expose merged Gemini and third-party quota
     // pools through retrieveUserQuotaSummary. It is the only remote source that
     // can independently report both rolling five-hour and weekly windows.
-    if let Some(raw_summary) = remote.retrieve_user_quota_summary(access_token).await? {
+    if let Some(raw_summary) = remote
+        .retrieve_user_quota_summary(access_token, project_id.as_deref())
+        .await?
+    {
         if let Some(summary) = sanitize_authoritative_quota_summary(&raw_summary) {
             let aggregation = aggregate_antigravity_quotas(None, Some(&summary), observed_at);
             for diagnostic in &aggregation.diagnostics {

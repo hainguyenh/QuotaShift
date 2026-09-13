@@ -17,6 +17,8 @@ jobs:
             os-name: 'windows'
           - platform: 'ubuntu-22.04'
             os-name: 'linux'
+          - platform: 'macos-latest'
+            os-name: 'macos'
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
@@ -45,8 +47,8 @@ jobs:
           New-Item -ItemType Directory -Path "C:\cargo-target" -Force | Out-Null
           "CARGO_TARGET_DIR=C:/cargo-target/quotashift" | Add-Content -Path $env:GITHUB_ENV
 
-      - name: Rust cache (Linux)
-        if: matrix.os-name == 'linux'
+      - name: Rust cache (Linux / macOS)
+        if: matrix.os-name == 'linux' || matrix.os-name == 'macos'
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
@@ -101,27 +103,43 @@ jobs:
           find artifacts -type f -exec cp {} release-assets/ \;
           ls -R release-assets
 
+      - name: Get tag name
+        id: tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
       - name: Generate Release Notes with Checksums
         id: release_notes
         run: |
-          cat << 'EOF' > release-body.md
-          ## Release Details
-          
-          Choose the file that matches how you want to install:
-          - `*portable.exe` : Windows portable desktop app. Download and run directly.
-          - `*setup.exe` : Windows desktop installer.
-          - `*.deb` : Linux installer for Debian, Ubuntu, and compatible distributions.
-          
-          ### Assets SHA-256 Checksums
-          | File | SHA-256 Checksum |
+          TAG="${{ steps.tag.outputs.TAG }}"
+          REPO="${{ github.repository }}"
+          CHANGELOG_URL="https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md"
+
+          cat << EOF > release-body.md
+          > 📋 **[View full Changelog](${CHANGELOG_URL})**
+
+          ## Download
+
+          Choose the file that matches your platform and preferred install method:
+
+          | Platform | File pattern | Description |
+          | --- | --- | --- |
+          | 🪟 Windows | \`*-portable.exe\` | Portable app — download and run directly, no installation needed |
+          | 🪟 Windows | \`*-setup.exe\` | Installer — installs QuotaShift to your system |
+          | 🍎 macOS | \`*.dmg\` | Disk image installer for macOS |
+          | 🐧 Linux | \`*.deb\` | Debian/Ubuntu package |
+          | 🐧 Linux | \`*.AppImage\` | Portable Linux app (run on any distro) |
+
+          ## SHA-256 Checksums
+
+          | File | SHA-256 |
           | --- | --- |
           EOF
-          
+
           cd release-assets
           for file in *; do
             if [ -f "$file" ]; then
               sha256=$(sha256sum "$file" | cut -d' ' -f1)
-              echo "| $file | \`$sha256\` |" >> ../release-body.md
+              echo "| \`$file\` | \`$sha256\` |" >> ../release-body.md
             fi
           done
 

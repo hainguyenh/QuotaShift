@@ -337,6 +337,23 @@
 }
 
 /* ── Action Rows (Rescan, Export, Import) ── */
+.settings-backup-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-backup-row .settings-action-row {
+  flex: 1;
+  width: auto;
+}
+
+.settings-backup-row .settings-action-row:last-child,
+.settings-action-row--right {
+  justify-content: flex-end;
+  text-align: right;
+}
+
 .settings-action-row {
   display: flex;
   align-items: center;
@@ -375,4 +392,87 @@
 .settings-modal-content::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 2px;
+}
+
+/* ── Shortcut Bindings ── */
+.settings-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.settings-shortcut-row + .settings-shortcut-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-shortcut-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-shortcut-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-shortcut-hint {
+  font-size: 8px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.settings-shortcut-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-shortcut-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 3px 7px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.settings-shortcut-badge:hover {
+  border-color: var(--text-secondary);
+}
+
+.settings-shortcut-badge--recording {
+  border-color: var(--codex-accent, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--codex-accent, #3b82f6);
+}
+
+.settings-shortcut-reset {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.settings-shortcut-reset:hover {
+  color: var(--text-primary);
 }

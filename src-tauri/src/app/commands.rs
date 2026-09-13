@@ -90,17 +90,28 @@ pub fn export_backup_file(content: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn sync_codex_config(api_key: Option<String>, base_url: Option<String>, model: Option<String>) -> Result<(), String> {
+pub fn sync_codex_config(
+    api_key: Option<String>,
+    base_url: Option<String>,
+    model: Option<String>,
+) -> Result<(), String> {
     if let (Some(k), Some(u)) = (api_key.as_deref(), base_url.as_deref()) {
-        if !k.trim().is_empty() && !u.trim().is_empty() { return codex_sync::sync_codex_config(k, u, model.as_deref()); }
+        if !k.trim().is_empty() && !u.trim().is_empty() {
+            return codex_sync::sync_codex_config(k, u, model.as_deref());
+        }
     }
     Ok(())
 }
 
 #[tauri::command]
-pub fn sync_codex_provider_config(base_url: Option<String>, model: Option<String>) -> Result<(), String> {
+pub fn sync_codex_provider_config(
+    base_url: Option<String>,
+    model: Option<String>,
+) -> Result<(), String> {
     if let Some(u) = base_url.as_deref() {
-        if !u.trim().is_empty() { return codex_sync::sync_codex_provider_config(u, model.as_deref()); }
+        if !u.trim().is_empty() {
+            return codex_sync::sync_codex_provider_config(u, model.as_deref());
+        }
     }
     Ok(())
 }
@@ -128,7 +139,8 @@ pub async fn write_codex_auth(content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn kill_codex_processes() -> Result<crate::codex::process::CodexProcessKillResult, String> {
+pub async fn kill_codex_processes() -> Result<crate::codex::process::CodexProcessKillResult, String>
+{
     crate::codex::process::kill_codex_processes().await
 }
 
@@ -253,7 +265,8 @@ pub fn open_path_in_file_manager(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_logs_folder() -> Result<(), String> {
-    let dir = logger::get_log_dir().ok_or_else(|| "Could not determine log directory".to_string())?;
+    let dir =
+        logger::get_log_dir().ok_or_else(|| "Could not determine log directory".to_string())?;
     logger::log_info("window", &format!("Opening logs folder: {:?}", dir));
     crate::system::explorer::show_path_in_file_manager(&dir.to_string_lossy())
 }

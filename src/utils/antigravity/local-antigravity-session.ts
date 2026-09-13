@@ -1,4 +1,4 @@
-import type { AntigravityAccount, FullStatus, LocalAntigravitySession } from "../common/types";
+import type { AntigravityAccount, FullStatus, LocalAntigravitySession, QuotaData } from "../common/types";
 
 export const LOCAL_ANTIGRAVITY_SESSION_KEY = "quotashift_local_antigravity_session_v1";
 
@@ -11,6 +11,23 @@ export function createEmptyLocalAntigravitySession(): LocalAntigravitySession {
     online: false,
     lastSeenAt: null,
   };
+}
+
+export function resolveLocalSessionDisplayQuotas(
+  rawQuotas: QuotaData[] | undefined | null,
+  cachedCloudQuotas: QuotaData[] | undefined | null,
+  cachedQuotas: QuotaData[] | undefined | null,
+  accountQuotas: QuotaData[] | undefined | null,
+  accountCloudQuotas: QuotaData[] | undefined | null,
+  isExactGrouped: boolean,
+): QuotaData[] {
+  if (rawQuotas && rawQuotas.length > 0) return rawQuotas;
+  if (isExactGrouped && cachedCloudQuotas && cachedCloudQuotas.length > 0) return cachedCloudQuotas;
+  if (cachedQuotas && cachedQuotas.length > 0) return cachedQuotas;
+  if (accountQuotas && accountQuotas.length > 0) return accountQuotas;
+  if (cachedCloudQuotas && cachedCloudQuotas.length > 0) return cachedCloudQuotas;
+  if (accountCloudQuotas && accountCloudQuotas.length > 0) return accountCloudQuotas;
+  return [];
 }
 
 export function normalizeEmail(email: string | null | undefined): string {
