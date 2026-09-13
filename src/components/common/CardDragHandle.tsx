@@ -2,9 +2,9 @@ import React from "react";
 
 interface CardDragHandleProps {
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onPointerCancel: () => void;
+  onPointerMove?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel?: () => void;
 }
 
 export const CardDragHandle: React.FC<CardDragHandleProps> = ({
@@ -19,7 +19,6 @@ export const CardDragHandle: React.FC<CardDragHandleProps> = ({
     onPointerMove={onPointerMove}
     onPointerUp={onPointerUp}
     onPointerCancel={onPointerCancel}
-    onLostPointerCapture={onPointerCancel}
     onClick={(e) => e.stopPropagation()}
     data-tooltip="Drag to reorder"
   >

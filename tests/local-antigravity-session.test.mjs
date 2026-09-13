@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   createEmptyLocalAntigravitySession,
+  mergeDiskAntigravitySession,
   mergeLocalAntigravityStatus,
   canAddLocalSessionToMonitored,
+  normalizeLocalSessionQuotas,
 } from '../.test-build/local-antigravity-session.js';
 
 test('offline refresh retains the last captured identity and quota', () => {
@@ -41,6 +44,56 @@ test('successful local refresh updates identity but preserves captured credentia
   assert.equal(result.capturedAccount?.token, 'obf');
 });
 
+test('same local identity keeps refreshed in-memory credentials and credits when disk is stale', () => {
+  const previous = {
+    ...createEmptyLocalAntigravitySession(),
+    email: 'User@example.com',
+    credits: { balance: 12 },
+    quotas: [{ model: 'Gemini', percent: 75 }],
+    capturedAccount: {
+      token: 'refreshed-access',
+      refreshToken: 'refreshed-refresh',
+      email: 'User@example.com',
+      authMethod: 'consumer',
+    },
+  };
+  const result = mergeDiskAntigravitySession(previous, {
+    id: 'disk',
+    label: 'disk',
+    token: 'stale-access',
+    refreshToken: 'stale-refresh',
+    email: ' user@EXAMPLE.com ',
+    authMethod: 'consumer',
+  }, 2000);
+  assert.equal(result.capturedAccount?.token, 'refreshed-access');
+  assert.equal(result.capturedAccount?.refreshToken, 'refreshed-refresh');
+  assert.deepEqual(result.credits, { balance: 12 });
+  assert.equal(result.quotas.length, 1);
+  assert.equal(result.lastSeenAt, 2000);
+});
+
+test('different local identity adopts disk credentials and clears stale usage', () => {
+  const previous = {
+    ...createEmptyLocalAntigravitySession(),
+    email: 'old@example.com',
+    credits: { balance: 12 },
+    quotas: [{ model: 'Gemini', percent: 75 }],
+    capturedAccount: { token: 'old-access', email: 'old@example.com' },
+  };
+  const result = mergeDiskAntigravitySession(previous, {
+    id: 'disk',
+    label: 'disk',
+    token: 'new-access',
+    refreshToken: 'new-refresh',
+    email: 'new@example.com',
+  }, 3000);
+  assert.equal(result.email, 'new@example.com');
+  assert.equal(result.capturedAccount?.token, 'new-access');
+  assert.equal(result.capturedAccount?.refreshToken, 'new-refresh');
+  assert.equal(result.credits, null);
+  assert.deepEqual(result.quotas, []);
+});
+
 test('add button is hidden for a case-insensitive monitored duplicate', () => {
   const session = {
     ...createEmptyLocalAntigravitySession(),
@@ -71,15 +124,12 @@ test('loadLocalAntigravitySession and saveLocalAntigravitySession persist to loc
   };
 
   try {
-    // Empty storage
     const empty = loadLocalAntigravitySession();
     assert.equal(empty.online, false);
 
-    // Corrupted storage
     store.set(LOCAL_ANTIGRAVITY_SESSION_KEY, '{invalid');
     assert.equal(loadLocalAntigravitySession().online, false);
 
-    // Save and load
     const session = {
       email: 'saved@test.com',
       planTier: 'Pro',
@@ -91,9 +141,51 @@ test('loadLocalAntigravitySession and saveLocalAntigravitySession persist to loc
     saveLocalAntigravitySession(session);
     const loaded = loadLocalAntigravitySession();
     assert.equal(loaded.email, 'saved@test.com');
-    assert.equal(loaded.online, false); // always loaded as offline initially
+    assert.equal(loaded.online, false);
     assert.equal(loaded.quotas.length, 1);
   } finally {
     delete globalThis.localStorage;
   }
+});
+
+test('resolveLocalSessionDisplayQuotas prefers raw quotas when available', async () => {
+  const { resolveLocalSessionDisplayQuotas } = await import('../.test-build/local-antigravity-session.js');
+  const raw = [{ model: 'Gemini Models', percent: 80 }];
+  const cloud = [{ model: 'Gemini Models', percent: 20 }];
+  const result = resolveLocalSessionDisplayQuotas(raw, cloud, [], [], [], true);
+  assert.deepEqual(result, raw);
+});
+
+test('resolveLocalSessionDisplayQuotas falls back to cached cloud quotas when raw is empty', async () => {
+  const { resolveLocalSessionDisplayQuotas } = await import('../.test-build/local-antigravity-session.js');
+  const cloud = [{ model: 'Claude & OpenAI Models', percent: 65, weeklyPercent: 30 }];
+  const result = resolveLocalSessionDisplayQuotas([], cloud, [], [], [], true);
+  assert.deepEqual(result, cloud);
+});
+
+test('resolveLocalSessionDisplayQuotas falls back to account quotas or returns empty array when none available', async () => {
+  const { resolveLocalSessionDisplayQuotas } = await import('../.test-build/local-antigravity-session.js');
+  const accountQuotas = [{ model: 'Gemini Models', percent: 50 }];
+  assert.deepEqual(resolveLocalSessionDisplayQuotas([], [], [], accountQuotas, [], false), accountQuotas);
+  assert.deepEqual(resolveLocalSessionDisplayQuotas([], [], [], [], [], false), []);
+});
+
+test('drops legacy cloud-shaped local quota rows without a display model', () => {
+  const stale = normalizeLocalSessionQuotas([
+    { modelId: 'gemini_pool', displayName: 'Gemini Models', fiveHourPercent: 78, weeklyPercent: 80 },
+    { modelId: 'claude_and_gpt_pool', displayName: 'Claude & OpenAI Models', fiveHourPercent: 100, weeklyPercent: 67 },
+  ]);
+  assert.deepEqual(stale, []);
+
+  const valid = normalizeLocalSessionQuotas([
+    { model: 'Gemini Models', percent: 78, refreshTime: 'Ready', fiveHourPercent: 78, weeklyPercent: 80 },
+    { model: 'Claude & OpenAI Models', percent: 100, refreshTime: 'Ready', fiveHourPercent: 100, weeklyPercent: 67 },
+  ]);
+  assert.deepEqual(valid.map((quota) => quota.model), ['Gemini Models', 'Claude & OpenAI Models']);
+});
+
+test('local session refresh converts cloud quotas into display pools and refreshes stale cache', () => {
+  const source = readFileSync(new URL('../src/hooks/useLocalSession.ts', import.meta.url), 'utf8');
+  assert.match(source, /aggregateCloudQuotasIntoPools\(res\.quotas\)/);
+  assert.match(source, /normalizeLocalSessionQuotas\(previous\.quotas\)/);
 });

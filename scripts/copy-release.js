@@ -23,7 +23,11 @@ if (!fs.existsSync(outputDir)) {
 const isWindows = process.platform === 'win32';
 const binaryName = isWindows ? 'QuotaShift.exe' : 'QuotaShift';
 const srcBinary = path.join(tauriReleaseDir, binaryName);
-const destBinaryName = isWindows ? 'QuotaShift-portable.exe' : 'QuotaShift-portable';
+const destBinaryName = isWindows
+  ? 'QuotaShift-portable.exe'
+  : process.platform === 'darwin'
+    ? 'QuotaShift-macos-portable'
+    : 'QuotaShift-linux-portable';
 const destBinary = path.join(outputDir, destBinaryName);
 
 if (fs.existsSync(srcBinary)) {
@@ -36,7 +40,7 @@ if (fs.existsSync(srcBinary)) {
 // 2. Find and copy the installer package
 const bundleDir = path.join(tauriReleaseDir, 'bundle');
 if (fs.existsSync(bundleDir)) {
-  const formats = ['nsis', 'deb', 'appimage'];
+  const formats = ['nsis', 'deb', 'appimage', 'dmg', 'macos'];
   for (const format of formats) {
     const formatDir = path.join(bundleDir, format);
     if (fs.existsSync(formatDir)) {

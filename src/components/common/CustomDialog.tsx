@@ -9,6 +9,9 @@ interface CustomDialogProps {
   confirmVariant?: "primary" | "danger";
   messageAlign?: "left" | "center";
   onClose: (confirmed: boolean) => void;
+  onCancelClick?: () => void;
+  confirmTooltip?: string;
+  cancelTooltip?: string;
 }
 
 export const CustomDialog: React.FC<CustomDialogProps> = ({
@@ -20,6 +23,9 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
   confirmVariant = "primary",
   messageAlign = "center",
   onClose,
+  onCancelClick,
+  confirmTooltip,
+  cancelTooltip,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,8 +46,11 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
           {isConfirm && (
             <button
               className="dialog-btn dialog-btn--cancel"
-              onClick={() => onClose(false)}
-              data-tooltip={cancelText === "Cancel" ? "Cancel the current action" : "Dismiss dialog"}
+              onClick={() => {
+                if (onCancelClick) onCancelClick();
+                else onClose(false);
+              }}
+              data-tooltip={cancelTooltip || (cancelText === "Cancel" ? "Cancel the current action" : cancelText)}
             >
               {cancelText}
             </button>
@@ -49,7 +58,7 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
           <button
             className={`dialog-btn ${confirmVariant === "danger" ? "dialog-btn--danger" : ""}`}
             onClick={() => onClose(true)}
-            data-tooltip={confirmVariant === "danger" ? "Delete and close dialog" : "Confirm and close dialog"}
+            data-tooltip={confirmTooltip || (confirmVariant === "danger" ? "Delete and close dialog" : confirmText)}
           >
             {confirmText}
           </button>

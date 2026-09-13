@@ -1,6 +1,6 @@
 [package]
 name = "quotashift"
-version = "1.0.3"
+version = "1.0.4"
 description = "QuotaShift - AI Quota & Account Swapper"
 authors = ["the-long-ride"]
 edition = "2021"
@@ -34,17 +34,16 @@ chrono = "0.4"
 sysinfo = "0.31"
 
 # -----------------------------------------------------------------------------
-# Security advisory workaround — RUSTSEC-2024-0429
-# glib::VariantStrIter unsoundness (affected: >= 0.15.0, < 0.20.0)
+# Security patch — RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g
 #
-# glib 0.18.x is hard-pinned by gtk 0.18.x, which is Tauri 2's Linux GTK3
-# backend. We cannot bump glib to 0.20 without gtk following suit. Tauri's
-# upstream GTK4 migration (PR #14684) will resolve this once merged.
+# Tauri 2's Linux GTK3 stack still constrains glib to 0.18.x, while the first
+# published non-vulnerable glib release is 0.20.0. Use a source-compatible
+# 0.18.5 backport containing only the upstream VariantStrIter soundness fix.
 #
-# Mitigation: QuotaShift never calls glib::VariantStrIter directly; the
-# vulnerable code path is not exercised. Windows builds are fully unaffected.
-# See: src-tauri/.cargo/audit.toml for the formal advisory suppression record.
-# Track: https://github.com/tauri-apps/tauri/pull/14684
+# The pinned revision is the backport commit itself. Its diff changes only the
+# FFI out-parameter in VariantStrIter::impl_get from &p to &mut p, matching
+# gtk-rs/gtk-rs-core#1343. Keep the immutable revision pin; do not track a
+# branch here.
 # -----------------------------------------------------------------------------
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -55,3 +54,9 @@ keyring = { version = "3.6.3", features = ["apple-native"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+
+[patch.crates-io]
+glib = { git = "https://github.com/andrew-wommack-ministries/glib-rustsec-2024-0429-backport", rev = "9e2bb20e2daba5b4dc5e2c9f4dee0797a1503b9f" }

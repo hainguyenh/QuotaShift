@@ -145,13 +145,15 @@ impl AntigravityRemoteClient {
     pub(crate) async fn retrieve_user_quota_summary(
         &self,
         access_token: &str,
+        project_id: Option<&str>,
     ) -> Result<Option<serde_json::Value>, AntigravityUsageCommandError> {
+        let body = match project_id {
+            Some(pid) if !pid.trim().is_empty() => serde_json::json!({ "project": pid.trim() }),
+            _ => serde_json::json!({}),
+        };
         for base_url in [&self.config.quota_base_url, &self.config.project_base_url] {
             let url = format!("{}/v1internal:retrieveUserQuotaSummary", base_url);
-            match self
-                .send_post(&url, access_token, serde_json::json!({}), false)
-                .await
-            {
+            match self.send_post(&url, access_token, body.clone(), true).await {
                 Ok(value) => return Ok(Some(value)),
                 Err(error) if error.code == "ANTIGRAVITY_REAUTH_REQUIRED" => return Err(error),
                 Err(error) => {

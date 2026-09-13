@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import appPackage from "../../../package.json";
 import { ThemeIcon } from "./HeaderIcons";
+import { ShortcutSettings } from "./ShortcutSettings";
 
 // Recommended ranges (in seconds)
 const TRACKED_MIN = 30;
@@ -269,6 +270,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <div className="settings-divider" />
 
+          <ShortcutSettings />
+
+          <div className="settings-divider" />
+
           {/* ── Data & Scanning ── */}
           <div className="settings-section">
             <div className="settings-section-title">Data</div>
@@ -303,23 +308,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="settings-divider" />
 
-            <button className="settings-action-row" onClick={onExportBackup}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span>Export Backup</span>
-            </button>
+            <div className="settings-backup-row">
+              <button className="settings-action-row" onClick={onExportBackup}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Export Backup</span>
+              </button>
 
-            <button className="settings-action-row" onClick={onImportBackup}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <polyline points="7 10 12 5 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="12" y1="5" x2="12" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span>Import Backup</span>
-            </button>
+              <button className="settings-action-row settings-action-row--right" onClick={onImportBackup}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="7 10 12 5 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <line x1="12" y1="5" x2="12" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Import Backup</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -9,10 +9,11 @@ interface AntigravityQuotaRowsProps {
 }
 
 export const AntigravityQuotaRows: React.FC<AntigravityQuotaRowsProps> = ({ quotas }) => {
-  if (!quotas?.length) return null;
+  const validQuotas = (quotas || []).filter((q): q is QuotaData => Boolean(q && typeof q === "object"));
+  if (!validQuotas.length) return null;
   return (
     <div className="codex-card-limits antigravity-quota-list">
-      {quotas.map((quota, index) => {
+      {validQuotas.map((quota, index) => {
         const fiveKnown = quota.fiveHourPercent !== undefined && quota.fiveHourPercent !== null;
         const weeklyKnown = quota.weeklyPercent !== undefined && quota.weeklyPercent !== null;
         const fiveReset = quota.fiveHourDisabled
@@ -27,7 +28,7 @@ export const AntigravityQuotaRows: React.FC<AntigravityQuotaRowsProps> = ({ quot
             : "Ready";
         return (
           <div
-            key={`${quota.model}-${index}`}
+            key={`${quota.model || index}-${index}`}
             className="antigravity-quota-group"
           >
             <div className="quota-item-header">

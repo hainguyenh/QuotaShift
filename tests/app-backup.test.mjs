@@ -82,6 +82,36 @@ test("extractBackupPayload extracts from raw account array", () => {
   assert.equal(payload.cxAccounts[0].id, "cx-arr");
 });
 
+test("extractBackupPayload handles direct arrays and OAuth codex accounts without apiKey", () => {
+  const backup = {
+    codex: [
+      { id: "acct-oauth-1", email: "user1@openai.com", lastPlan: "PLUS" },
+      { id: "acct-oauth-2", email: "user2@openai.com", tokens: { access_token: "abc" } },
+    ],
+    antigravity: [
+      { id: "ag-acct-1", email: "ag1@google.com", token: "tok-1" },
+    ],
+  };
+  const payload = extractBackupPayload(backup);
+  assert.equal(payload.agAccounts.length, 1);
+  assert.equal(payload.cxAccounts.length, 2);
+  assert.equal(payload.cxAccounts[0].email, "user1@openai.com");
+  assert.equal(payload.cxAccounts[1].email, "user2@openai.com");
+});
+
+test("extractBackupPayload extracts from mixed data.accounts array", () => {
+  const backup = {
+    accounts: [
+      { id: "ag-acct-x", email: "ag@x.com", token: "tok" },
+      { id: "cx-y", email: "cx@y.com", provider: "codex" },
+      { id: "acct-oauth-z", email: "cx@z.com" },
+    ],
+  };
+  const payload = extractBackupPayload(backup);
+  assert.equal(payload.agAccounts.length, 1);
+  assert.equal(payload.cxAccounts.length, 2);
+});
+
 test("restoreBackupData merges imported accounts with existing accounts", () => {
   mockStorage.clear();
   const existingAg = [{ id: "ag-keep", email: "keep@ag.com", token: "old-tok" }, { id: "ag-update", email: "update@ag.com", token: "old-tok" }];
@@ -109,6 +139,98 @@ test("restoreBackupData merges imported accounts with existing accounts", () => 
   assert.ok(mockStorage.has("antigravity-codex-accounts"));
   assert.ok(mockStorage.has("antigravity-account-order"));
   assert.ok(mockStorage.has("antigravity-codex-account-order"));
+});
+
+test("restoreBackupData strictly enforces: existing -> overwrite, not existing -> add, unpresent -> ignored/kept", () => {
+  mockStorage.clear();
+  // Set up initial custom order in storage
+  mockStorage.set("antigravity-account-order", JSON.stringify(["ag-preserved", "ag-to-overwrite"]));
+  mockStorage.set("antigravity-codex-account-order", JSON.stringify(["cx-preserved", "cx-to-overwrite"]));
+
+  const existingAg = [
+    { id: "ag-preserved", email: "stay@ag.com", label: "Stay AG", token: "keep-token-ag" },
+    { id: "ag-to-overwrite", email: "overwrite@ag.com", label: "Old Label AG", token: "old-token-ag" },
+  ];
+  const existingCx = [
+    { id: "cx-preserved", email: "stay@cx.com", label: "Stay CX", apiKey: "keep-key-cx" },
+    { id: "cx-to-overwrite", email: "overwrite@cx.com", label: "Old Label CX", apiKey: "old-key-cx" },
+  ];
+
+  const backup = {
+    version: 2,
+    antigravity: {
+      accounts: [
+        // 1. Existing account with case/whitespace variations -> must overwrite existing, keep ID
+        { id: "different-backup-id-1", email: " Overwrite@AG.com ", label: "New Label AG", token: "fresh-token-ag", lastPlan: "Pro" },
+        // 2. Not existing account -> must add
+        { id: "ag-brand-new", email: "fresh@ag.com", label: "Fresh AG", token: "brand-new-token" },
+      ],
+    },
+    codex: {
+      accounts: [
+        // 1. Existing account with case variations -> must overwrite existing, keep ID
+        { id: "different-backup-id-2", email: "OVERWRITE@cx.com", label: "New Label CX", apiKey: "fresh-key-cx", lastPlan: "Plus" },
+        // 2. Not existing account -> must add
+        { id: "cx-brand-new", email: "fresh@cx.com", label: "Fresh CX", apiKey: "brand-new-cx-key" },
+      ],
+    },
+  };
+
+  const res = restoreBackupData(backup, existingAg, existingCx, []);
+
+  // Verify counters
+  assert.equal(res.updatedAntigravityCount, 1);
+  assert.equal(res.importedAntigravityCount, 1);
+  assert.equal(res.updatedCodexCount, 1);
+  assert.equal(res.importedCodexCount, 1);
+
+  // Verify Antigravity accounts: total should be 3 (1 preserved + 1 overwritten + 1 added)
+  assert.equal(res.accounts.antigravity.length, 3);
+
+  // 1. Existing account NOT present in backup -> ignored, preserved untouched
+  const agPreserved = res.accounts.antigravity.find((a) => a.id === "ag-preserved");
+  assert.ok(agPreserved, "Existing account not in backup must be retained");
+  assert.equal(agPreserved.token, "keep-token-ag");
+  assert.equal(agPreserved.label, "Stay AG");
+
+  // 2. Existing account present in backup -> overwritten with new fields, keeping local ID
+  const agOverwritten = res.accounts.antigravity.find((a) => a.id === "ag-to-overwrite");
+  assert.ok(agOverwritten, "Existing matching account must exist with original ID");
+  assert.equal(agOverwritten.label, "New Label AG");
+  assert.equal(agOverwritten.token, "fresh-token-ag");
+  assert.equal(agOverwritten.lastPlan, "Pro");
+
+  // 3. New account in backup -> added
+  const agAdded = res.accounts.antigravity.find((a) => a.id === "ag-brand-new");
+  assert.ok(agAdded, "New account in backup must be added");
+  assert.equal(agAdded.email, "fresh@ag.com");
+
+  // Verify Codex accounts: total should be 3 (1 preserved + 1 overwritten + 1 added)
+  assert.equal(res.accounts.codex.length, 3);
+
+  // 1. Existing account NOT present in backup -> ignored, preserved untouched
+  const cxPreserved = res.accounts.codex.find((a) => a.id === "cx-preserved");
+  assert.ok(cxPreserved, "Existing codex account not in backup must be retained");
+  assert.equal(cxPreserved.apiKey, "keep-key-cx");
+
+  // 2. Existing account present in backup -> overwritten with new fields, keeping local ID
+  const cxOverwritten = res.accounts.codex.find((a) => a.id === "cx-to-overwrite");
+  assert.ok(cxOverwritten, "Existing matching codex account must exist with original ID");
+  assert.equal(cxOverwritten.label, "New Label CX");
+  assert.equal(cxOverwritten.apiKey, "fresh-key-cx");
+  assert.equal(cxOverwritten.lastPlan, "Plus");
+
+  // 3. New account in backup -> added
+  const cxAdded = res.accounts.codex.find((a) => a.id === "cx-brand-new");
+  assert.ok(cxAdded, "New codex account in backup must be added");
+  assert.equal(cxAdded.email, "fresh@cx.com");
+
+  // Verify order preservation: preserved and overwritten maintain position, newly added appended
+  const savedAgOrder = JSON.parse(mockStorage.get("antigravity-account-order"));
+  assert.deepEqual(savedAgOrder, ["ag-preserved", "ag-to-overwrite", "ag-brand-new"]);
+
+  const savedCxOrder = JSON.parse(mockStorage.get("antigravity-codex-account-order"));
+  assert.deepEqual(savedCxOrder, ["cx-preserved", "cx-to-overwrite", "cx-brand-new"]);
 });
 
 test("encryptBackup and decryptBackup round-trip encrypted data", async () => {
@@ -165,3 +287,14 @@ test("Backend contracts: open_path_in_file_manager is cross-platform for Windows
   assert.match(commandsSrc, /pub fn open_path_in_file_manager\(path:\s*String\)/);
   assert.match(libSrc, /open_path_in_file_manager/);
 });
+
+test("Import contracts: App.tsx calls restoreBackupData and updates accounts in state", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const appSrc = fs.readFileSync(path.resolve("src/App.tsx"), "utf-8");
+
+  assert.match(appSrc, /restoreBackupData\(pData,\s*antigravityAccounts,\s*codexAccounts/);
+  assert.match(appSrc, /setAntigravityAccounts\(res\.accounts\.antigravity\)/);
+  assert.match(appSrc, /setCodexAccounts\(res\.accounts\.codex\)/);
+});
+

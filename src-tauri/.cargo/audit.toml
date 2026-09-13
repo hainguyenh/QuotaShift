@@ -1,23 +1,25 @@
 [advisories]
 ignore = [
-    # RUSTSEC-2024-0429: Unsoundness in `Iterator` and `DoubleEndedIterator`
-    # impls for `glib::VariantStrIter` (glib versions >= 0.15.0, < 0.20.0).
+    # RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g
+    # Unsoundness in glib::VariantStrIter for published glib >= 0.15.0, < 0.20.0.
     #
-    # Root cause: glib 0.18.x is a hard transitive dependency of gtk 0.18.x,
-    # which is in turn required by tauri 2.x's Linux GTK3 backend. Upgrading
-    # glib to 0.20 would require gtk to also move to 0.20 (GTK4), which Tauri
-    # has not yet completed (migration PR #14684 is in progress upstream).
+    # Tauri 2's Linux GTK3 graph still requires the glib 0.18 API. Cargo.toml
+    # therefore patches glib to the source-compatible 0.18.5 backport at the
+    # immutable backport commit:
+    # 9e2bb20e2daba5b4dc5e2c9f4dee0797a1503b9f
+    # https://github.com/andrew-wommack-ministries/glib-rustsec-2024-0429-backport
     #
-    # Impact assessment for this project:
-    # - QuotaShift does NOT use `glib::VariantStrIter` directly.
-    # - The vulnerable code path is only triggered when iterating over
-    #   GVariant string arrays via that specific iterator — not a code path
-    #   exercised by Tauri's window/tray/IPC plumbing.
-    # - Windows builds are entirely unaffected (no GTK dependency at all).
-    # - Linux builds carry the theoretical risk but only if VariantStrIter
-    #   is used, which it is not in this application.
+    # That commit applies only the upstream gtk-rs-core#1343 fix in
+    # VariantStrIter::impl_get: the C out-parameter is passed as &mut p instead
+    # of &p. No public API changes are introduced.
     #
-    # Track resolution at: https://github.com/tauri-apps/tauri/pull/14684
+    # cargo-audit / RustSec is a version-based scanner. The patched source must
+    # retain version 0.18.5 for GTK3 semver compatibility, so it still matches
+    # the advisory range even though the vulnerable code has been replaced.
+    # Keep this narrowly-scoped ignore until Tauri's GTK stack can use a
+    # published glib >= 0.20 release.
+    #
+    # Upstream fix: https://github.com/gtk-rs/gtk-rs-core/pull/1343
     # Advisory: https://rustsec.org/advisories/RUSTSEC-2024-0429.html
     "RUSTSEC-2024-0429",
 ]

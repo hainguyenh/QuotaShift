@@ -142,14 +142,14 @@ fn frontend_uses_remote_first_weekly_refresh_when_tracking_or_adding_an_account(
 
 #[test]
 fn windows_exact_worker_can_discover_non_default_antigravity_installations() {
-    let session = repo_file("src/system/session.rs");
+    let executable = repo_file("src/system/session/executable.rs");
 
     assert!(
-        session.contains("ExecutablePath"),
+        executable.contains("ExecutablePath"),
         "Windows executable discovery should reuse the path of a running Antigravity process"
     );
     assert!(
-        session.contains("ProgramFiles"),
+        executable.contains("ProgramFiles"),
         "Windows executable discovery should search system install directories as well as LOCALAPPDATA"
     );
 }

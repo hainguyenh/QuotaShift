@@ -147,7 +147,7 @@ export const CodexTab: React.FC<CodexTabProps> = ({
                 <p className="codex-empty-sub">No accounts found matching "{searchQuery?.trim()}"</p>
               </div>
             ) : (
-              <div ref={sortableContainerRef} className="codex-accounts-container" style={{ display: "flex", flexDirection: "column", cursor: draggingId ? "grabbing" : undefined }} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onLostPointerCapture={handlePointerCancel}>
+              <div ref={sortableContainerRef} className="codex-accounts-container" style={{ display: "flex", flexDirection: "column", cursor: draggingId ? "grabbing" : undefined }} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel}>
             {displayedAccounts.map((acc) => {
               const isSelected = acc.id === activeId;
               const effectiveTrackedId = trackedProvider === "codex" ? (trackedAccountId !== undefined ? trackedAccountId : (lastFullStatus?.monitoredCodex?.accountId ?? activeId)) : null;

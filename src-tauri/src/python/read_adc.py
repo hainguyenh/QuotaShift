@@ -24,6 +24,7 @@ for p in paths:
             result["antigravityUnifiedStateSync.oauthToken"] = data["access_token"]
         if data.get("token_uri"):
             result["antigravity.tokenUri"] = data["token_uri"]
+        result["_mtime"] = os.path.getmtime(p)
         break
     except:
         pass

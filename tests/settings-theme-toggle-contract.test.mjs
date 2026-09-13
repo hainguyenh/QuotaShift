@@ -39,3 +39,10 @@ test('settings-modal.css defines clean light mode segmented switch track and whi
   assert.doesNotMatch(settingsModalCss, /\[data-theme="light"\]\s+\.settings-segment-btn--active\s*\{[^}]*background:\s*#18181b;/);
 });
 
+test('SettingsModal renders Export Backup and Import Backup side by side in settings-backup-row', () => {
+  assert.match(settingsModalCode, /<div className="settings-backup-row">[\s\S]*?Export Backup[\s\S]*?Import Backup[\s\S]*?<\/div>/);
+  assert.match(settingsModalCss, /\.settings-backup-row\s*\{[^}]*display:\s*flex;/);
+  assert.match(settingsModalCss, /\.settings-backup-row\s+\.settings-action-row\s*\{[^}]*flex:\s*1;/);
+  assert.match(settingsModalCss, /\.settings-backup-row\s+\.settings-action-row:last-child[\s\S]*?justify-content:\s*flex-end;/);
+});
+

@@ -12,7 +12,12 @@ on:
         description: 'Build Linux desktop binaries'
         required: false
         type: boolean
-        default: true
+        default: false
+      build_macos:
+        description: 'Build macOS desktop binaries'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - manual/windows-build
@@ -104,5 +109,44 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: quotashift-linux
+          path: release/*
+          if-no-files-found: error
+
+  build-macos:
+    name: Build Desktop (macOS)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_macos }}
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build desktop app
+        run: pnpm build:release
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: quotashift-macos
           path: release/*
           if-no-files-found: error

@@ -123,14 +123,14 @@ pub struct AntigravityProcess {
 
 fn classify_cmdline(cmd_line: &str) -> Option<ProcessKind> {
     let lower = cmd_line.to_lowercase();
+    if lower.contains("antigravity-workers") {
+        return None;
+    }
     if lower.contains("--app_data_dir") && lower.contains("antigravity-ide") {
         Some(ProcessKind::Ide)
     } else if lower.contains("--app_data_dir") && lower.contains("antigravity") {
         Some(ProcessKind::App)
-    } else if lower.contains("antigravity-cli")
-        || lower.contains("antigravity_cli")
-        || lower.contains("agy")
-    {
+    } else if (lower.contains("antigravity-cli") || lower.contains("antigravity_cli") || lower.contains("agy")) && lower.contains("--csrf") {
         Some(ProcessKind::Cli)
     } else if lower.contains("language_server") {
         Some(ProcessKind::Ide)
@@ -146,7 +146,7 @@ pub fn scan_processes() -> Vec<AntigravityProcess> {
         .args([
             "-NoProfile",
             "-Command",
-            "Get-CimInstance Win32_Process | Where-Object {$_.Name -like '*language_server*' -or $_.Name -like '*agy*' -or $_.CommandLine -like '*agy*'} | Select-Object ProcessId,CommandLine | ConvertTo-Json"
+            "Get-CimInstance Win32_Process | Where-Object {($_.Name -like '*language_server*' -or $_.CommandLine -like '*language_server*') -or (($_.Name -like '*agy*' -or $_.CommandLine -like '*agy*') -and $_.CommandLine -like '*--csrf*')} | Select-Object ProcessId,CommandLine | ConvertTo-Json"
         ])
         .output() {
         Ok(o) => o,

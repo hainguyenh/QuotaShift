@@ -14,6 +14,7 @@ pcred = ctypes.POINTER(CREDENTIAL)()
 if adv.CredReadW("gemini:antigravity", CRED_TYPE_GENERIC, 0, ctypes.byref(pcred)):
     cred = pcred.contents
     blob = bytes(cred.CredentialBlob[:cred.CredentialBlobSize])
+    last_written = (cred.LastWritten.dwHighDateTime << 32) | cred.LastWritten.dwLowDateTime
     adv.CredFree(pcred)
     try:
         data = json.loads(blob.decode("utf-8"))
@@ -23,6 +24,7 @@ if adv.CredReadW("gemini:antigravity", CRED_TYPE_GENERIC, 0, ctypes.byref(pcred)
             "antigravity.refreshToken": tok.get("refresh_token", ""),
             "antigravity.credentialManagerVersion": "2",
             "antigravity.authMethod": data.get("auth_method", "consumer"),
+            "_mtime": (last_written - 116444736000000000) / 10000000.0 if last_written else 0
         }
         id_tok = data.get("id_token")
         if id_tok and isinstance(id_tok, str):

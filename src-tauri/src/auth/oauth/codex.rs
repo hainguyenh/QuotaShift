@@ -275,14 +275,11 @@ pub async fn fetch_chatgpt_rate_limit_reset_credits(
         .get("https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")
         .bearer_auth(&access_token)
         .header("Originator", "Codex Desktop")
-        .header("OAI-Language", "en")
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .header("Accept", "application/json");
 
-    if let Some(ref aid) = account_id {
-        if !aid.is_empty() {
-            req = req.header("ChatGPT-Account-Id", aid.as_str());
-        }
+    if let Some(ref aid) = account_id.filter(|a| !a.is_empty()) {
+        req = req.header("ChatGPT-Account-Id", aid.as_str());
     }
 
     let res = req.send().await.map_err(|e| e.to_string())?;

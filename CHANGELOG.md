@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-09-14
+
+### Added
+
+- Configurable global shortcuts for toggling the desktop overlay and refreshing usage.
+- macOS release builds and packaged release artifacts.
+- Backup and restore support for Codex pools alongside Antigravity and Codex accounts.
+
+### Changed
+
+- Improved local Antigravity session synchronization, quota refresh behavior, HTTP fallback handling, pointer-based card reordering, and update/backup UX.
+- Bumped application version to 1.0.4 across `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
+
+### Fixed
+
+- Prevented refreshed local Antigravity credentials from being overwritten by stale same-session disk state.
+- Prevented Linux and macOS portable release artifacts from colliding by using platform-specific file names.
+- Guarded model-logo rendering against missing model names to avoid `toLowerCase` crashes.
+- Restored Codex pool state immediately after backup import.
+
 ## [1.0.3] - 2026-09-12
 
 ### Added

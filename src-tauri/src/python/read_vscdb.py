@@ -107,9 +107,12 @@ for db in db_paths:
         else:
             res["antigravity.authMethod"] = "consumer"
             
+        if "antigravityUnifiedStateSync.oauthToken" in res:
+            res["_mtime"] = os.path.getmtime(db)
+            conn.close()
+            found = True
+            break
         conn.close()
-        found = True
-        break
     except:
         pass
 

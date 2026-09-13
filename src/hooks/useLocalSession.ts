@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { AntigravityAccount, LocalAntigravitySession, FullStatus } from "../utils/common/types";
+import { deobfuscate, obfuscate } from "../utils/auth/auth";
 import {
   loadLocalAntigravitySession,
   saveLocalAntigravitySession,
+  mergeDiskAntigravitySession,
   mergeLocalAntigravityStatus,
   canAddLocalSessionToMonitored,
+  normalizeEmail,
+  normalizeLocalSessionQuotas,
 } from "../utils/antigravity/local-antigravity-session";
+import { aggregateCloudQuotasIntoPools } from "../utils/antigravity/antigravity-quota";
+import { extractAntigravitySessionAccount } from "../utils/antigravity/current-local-session";
 import { resolveAntigravityPlanName, ANTIGRAVITY_ORDER_KEY } from "../utils/common/app-constants";
 import { saveAntigravityAccounts } from "../utils/common/app-storage";
 import { saveAccountOrder } from "../utils/account/account-order";
@@ -18,11 +25,89 @@ export const useLocalSession = (
   const [localAntigravitySession, setLocalAntigravitySession] = useState<LocalAntigravitySession>(
     () => loadLocalAntigravitySession(),
   );
+  const localAntigravitySessionRef = useRef(localAntigravitySession);
+  localAntigravitySessionRef.current = localAntigravitySession;
+
+  const refreshLocalSessionQuota = useCallback(
+    async (sessionOverride?: LocalAntigravitySession) => {
+      const session = sessionOverride || localAntigravitySessionRef.current;
+      const captured = session.capturedAccount;
+      if (!captured?.token) return;
+      try {
+        const rawToken = deobfuscate(captured.token);
+        const rawRefreshToken = captured.refreshToken
+          ? deobfuscate(captured.refreshToken)
+          : undefined;
+        const res = await invoke<any>("fetch_antigravity_account_usage", {
+          accessToken: rawToken,
+          refreshToken: rawRefreshToken ?? null,
+          authMethod: captured.authMethod ?? null,
+        });
+        if (res?.quotas) {
+          setLocalAntigravitySession((prev) => {
+            const next: LocalAntigravitySession = {
+              ...prev,
+              quotas: aggregateCloudQuotasIntoPools(res.quotas),
+              planTier: res.planTier ?? prev.planTier,
+              online: true,
+              lastSeenAt: Date.now(),
+              capturedAccount: prev.capturedAccount
+                ? {
+                    ...prev.capturedAccount,
+                    token: res.refreshedTokens?.accessToken
+                      ? obfuscate(res.refreshedTokens.accessToken)
+                      : prev.capturedAccount.token,
+                  }
+                : prev.capturedAccount,
+            };
+            localAntigravitySessionRef.current = next;
+            saveLocalAntigravitySession(next);
+            return next;
+          });
+        }
+      } catch (e) {
+        console.warn("Could not fetch remote usage for local session:", e);
+      }
+    },
+    [],
+  );
+
+  const syncLocalSessionFromDisk = useCallback(async () => {
+    try {
+      const rawSession = await invoke<any>("read_antigravity_session");
+      if (!rawSession) return;
+      const candidate = extractAntigravitySessionAccount(rawSession);
+      if (candidate && candidate.email) {
+        const previous = localAntigravitySessionRef.current;
+        const previousEmail = normalizeEmail(previous.email ?? previous.capturedAccount?.email);
+        const candidateEmail = normalizeEmail(candidate.email);
+        const normalizedPreviousQuotas = normalizeLocalSessionQuotas(previous.quotas);
+        const shouldRefresh =
+          previousEmail !== candidateEmail ||
+          normalizedPreviousQuotas.length === 0 ||
+          !previous.capturedAccount?.token;
+        const next = mergeDiskAntigravitySession(previous, candidate);
+        localAntigravitySessionRef.current = next;
+        saveLocalAntigravitySession(next);
+        setLocalAntigravitySession(next);
+        if (shouldRefresh && next.capturedAccount?.token) {
+          void refreshLocalSessionQuota(next);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to sync local Antigravity session from disk:", e);
+    }
+  }, [refreshLocalSessionQuota]);
+
+  useEffect(() => {
+    syncLocalSessionFromDisk();
+  }, [syncLocalSessionFromDisk]);
 
   const updateLocalSessionFromStatus = (status: FullStatus | null) => {
     if (!status) return;
     setLocalAntigravitySession((prev) => {
       const next = mergeLocalAntigravityStatus(prev, status);
+      localAntigravitySessionRef.current = next;
       saveLocalAntigravitySession(next);
       return next;
     });
@@ -42,6 +127,7 @@ export const useLocalSession = (
           authMethod: captured.authMethod,
         },
       };
+      localAntigravitySessionRef.current = next;
       saveLocalAntigravitySession(next);
       return next;
     });
@@ -97,6 +183,7 @@ export const useLocalSession = (
           authMethod: acc.authMethod,
         },
       };
+      localAntigravitySessionRef.current = next;
       saveLocalAntigravitySession(next);
       return next;
     });
@@ -109,5 +196,7 @@ export const useLocalSession = (
     handleLocalAntigravitySessionCaptured,
     handleAddLocalSessionToMonitored,
     handleApplyAccountToLocalSession,
+    syncLocalSessionFromDisk,
+    refreshLocalSessionQuota,
   };
 };

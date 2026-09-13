@@ -2,6 +2,8 @@ use serde_json::Value;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
+pub(crate) mod source;
+
 #[cfg(target_os = "windows")]
 const READ_CRED_MGR_PY: &str = include_str!("../../python/read_cred_mgr.py");
 const READ_VSCDB_PY: &str = include_str!("../../python/read_vscdb.py");
@@ -122,7 +124,8 @@ fn get_adc_paths() -> Vec<std::path::PathBuf> {
 }
 
 pub async fn read_antigravity_session() -> Result<Value, String> {
-    let mut result_map = serde_json::Map::new();
+    #[allow(unused_mut)]
+    let mut credential_manager_map = None;
 
     #[cfg(target_os = "windows")]
     {
@@ -132,13 +135,9 @@ pub async fn read_antigravity_session() -> Result<Value, String> {
             .map_err(|e| format!("Failed to run python: {}", e))?;
         if output.status.success() {
             let stdout_str = String::from_utf8_lossy(&output.stdout);
-            if let Ok(val) = serde_json::from_str::<Value>(stdout_str.trim()) {
-                if let Some(obj) = val.as_object() {
-                    for (k, v) in obj {
-                        result_map.insert(k.clone(), v.clone());
-                    }
-                }
-            }
+            credential_manager_map = serde_json::from_str::<Value>(stdout_str.trim())
+                .ok()
+                .and_then(|value| value.as_object().cloned());
         }
     }
 
@@ -159,15 +158,9 @@ pub async fn read_antigravity_session() -> Result<Value, String> {
     }
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
-    if let Ok(val) = serde_json::from_str::<Value>(stdout_str.trim()) {
-        if let Some(obj) = val.as_object() {
-            for (k, v) in obj {
-                if !result_map.contains_key(k) {
-                    result_map.insert(k.clone(), v.clone());
-                }
-            }
-        }
-    }
+    let vscdb_map = serde_json::from_str::<Value>(stdout_str.trim())
+        .ok()
+        .and_then(|value| value.as_object().cloned());
 
     let adc_paths = get_adc_paths();
     let adc_paths_str = adc_paths
@@ -176,25 +169,24 @@ pub async fn read_antigravity_session() -> Result<Value, String> {
         .collect::<Vec<String>>()
         .join("|");
 
-    let adc_output = crate::run_cmd(Command::new("python"))
+    let adc_map = crate::run_cmd(Command::new("python"))
         .args(["-c", READ_ADC_PY, &adc_paths_str])
-        .output();
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| {
+            serde_json::from_slice::<Value>(&output.stdout)
+                .ok()
+                .and_then(|value| value.as_object().cloned())
+        });
 
-    if let Ok(output) = adc_output {
-        if output.status.success() {
-            let adc_stdout = String::from_utf8_lossy(&output.stdout);
-            if let Ok(val) = serde_json::from_str::<Value>(adc_stdout.trim()) {
-                if let Some(obj) = val.as_object() {
-                    for (k, v) in obj {
-                        if !result_map.contains_key(k) {
-                            result_map.insert(k.clone(), v.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    let runtime = super::detect_antigravity_runtime();
+    let result_map = source::select_antigravity_session_map(
+        &runtime,
+        credential_manager_map,
+        vscdb_map,
+        adc_map,
+    );
     Ok(Value::Object(result_map))
 }
 
