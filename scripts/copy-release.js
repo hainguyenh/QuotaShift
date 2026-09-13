@@ -23,7 +23,11 @@ if (!fs.existsSync(outputDir)) {
 const isWindows = process.platform === 'win32';
 const binaryName = isWindows ? 'QuotaShift.exe' : 'QuotaShift';
 const srcBinary = path.join(tauriReleaseDir, binaryName);
-const destBinaryName = isWindows ? 'QuotaShift-portable.exe' : 'QuotaShift-portable';
+const destBinaryName = isWindows
+  ? 'QuotaShift-portable.exe'
+  : process.platform === 'darwin'
+    ? 'QuotaShift-macos-portable'
+    : 'QuotaShift-linux-portable';
 const destBinary = path.join(outputDir, destBinaryName);
 
 if (fs.existsSync(srcBinary)) {

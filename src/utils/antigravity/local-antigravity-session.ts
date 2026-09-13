@@ -34,6 +34,39 @@ export function normalizeEmail(email: string | null | undefined): string {
   return (email || "").trim().toLowerCase();
 }
 
+export function mergeDiskAntigravitySession(
+  previous: LocalAntigravitySession,
+  candidate: AntigravityAccount,
+  now = Date.now(),
+): LocalAntigravitySession {
+  const previousEmail = normalizeEmail(previous.email ?? previous.capturedAccount?.email);
+  const candidateEmail = normalizeEmail(candidate.email);
+  const sameIdentity = Boolean(previousEmail && candidateEmail && previousEmail === candidateEmail);
+  const previousCaptured = previous.capturedAccount;
+  const preserveCurrentCredentials = Boolean(
+    sameIdentity && previousCaptured && (previousCaptured.token || previousCaptured.refreshToken),
+  );
+
+  return {
+    ...previous,
+    email: candidate.email ?? previous.email,
+    planTier: candidate.lastPlan ?? previous.planTier,
+    credits: sameIdentity ? previous.credits : null,
+    quotas: sameIdentity ? previous.quotas : [],
+    online: true,
+    lastSeenAt: now,
+    capturedAccount: {
+      token: preserveCurrentCredentials ? previousCaptured!.token : candidate.token,
+      refreshToken: preserveCurrentCredentials
+        ? (previousCaptured!.refreshToken ?? candidate.refreshToken)
+        : candidate.refreshToken,
+      profileUrl: candidate.profileUrl ?? previousCaptured?.profileUrl,
+      email: candidate.email ?? previousCaptured?.email,
+      authMethod: candidate.authMethod ?? previousCaptured?.authMethod,
+    },
+  };
+}
+
 export function mergeLocalAntigravityStatus(
   previous: LocalAntigravitySession,
   status: Partial<FullStatus> | null,

@@ -197,7 +197,6 @@ export const App: React.FC = () => {
     }
     emit("overlay-data-update", payload); localStorage.setItem("quotashift_overlay_data", JSON.stringify(payload));
   }, [antigravityAccounts, codexAccounts, activeAntigravityId, activeCodexId, antigravityUsageCache, codexUsageCache, claudeMonitorStatus, trackedAccountId, lastFullStatus]);
-
   // Effect 1: Claude monitor polling (independent 2s timer)
   useEffect(() => {
     let cancelled = false; invoke<ClaudeMonitorStatus>("ensure_claude_statusline_bridge").then((s) => { if (!cancelled) setClaudeMonitorStatus(s); }).catch(() => {});
@@ -291,7 +290,7 @@ export const App: React.FC = () => {
     } else if (pendingBackup) {
       try {
         const pData: any = await decryptBackup(pendingBackup, passphrase), res = restoreBackupData(pData, antigravityAccounts, codexAccounts, loadCodexPools());
-        setAntigravityAccounts(res.accounts.antigravity); setCodexAccounts(res.accounts.codex); setPassOpen(false); void triggerRefresh(true);
+        setAntigravityAccounts(res.accounts.antigravity); setCodexAccounts(res.accounts.codex); setCodexPools(res.accounts.pools); setPassOpen(false); void triggerRefresh(true);
         showToast(`Imported ${res.importedAntigravityCount + res.importedCodexCount} accounts (${res.updatedAntigravityCount + res.updatedCodexCount} updated)`, "info");
       } catch { showToast("Invalid passphrase or corrupted backup", "error"); }
     }

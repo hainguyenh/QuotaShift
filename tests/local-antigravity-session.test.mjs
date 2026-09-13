@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createEmptyLocalAntigravitySession,
+  mergeDiskAntigravitySession,
   mergeLocalAntigravityStatus,
   canAddLocalSessionToMonitored,
 } from '../.test-build/local-antigravity-session.js';
@@ -39,6 +40,56 @@ test('successful local refresh updates identity but preserves captured credentia
   assert.equal(result.email, 'new@example.com');
   assert.equal(result.lastSeenAt, 1234);
   assert.equal(result.capturedAccount?.token, 'obf');
+});
+
+test('same local identity keeps refreshed in-memory credentials and credits when disk is stale', () => {
+  const previous = {
+    ...createEmptyLocalAntigravitySession(),
+    email: 'User@example.com',
+    credits: { balance: 12 },
+    quotas: [{ model: 'Gemini', percent: 75 }],
+    capturedAccount: {
+      token: 'refreshed-access',
+      refreshToken: 'refreshed-refresh',
+      email: 'User@example.com',
+      authMethod: 'consumer',
+    },
+  };
+  const result = mergeDiskAntigravitySession(previous, {
+    id: 'disk',
+    label: 'disk',
+    token: 'stale-access',
+    refreshToken: 'stale-refresh',
+    email: ' user@EXAMPLE.com ',
+    authMethod: 'consumer',
+  }, 2000);
+  assert.equal(result.capturedAccount?.token, 'refreshed-access');
+  assert.equal(result.capturedAccount?.refreshToken, 'refreshed-refresh');
+  assert.deepEqual(result.credits, { balance: 12 });
+  assert.equal(result.quotas.length, 1);
+  assert.equal(result.lastSeenAt, 2000);
+});
+
+test('different local identity adopts disk credentials and clears stale usage', () => {
+  const previous = {
+    ...createEmptyLocalAntigravitySession(),
+    email: 'old@example.com',
+    credits: { balance: 12 },
+    quotas: [{ model: 'Gemini', percent: 75 }],
+    capturedAccount: { token: 'old-access', email: 'old@example.com' },
+  };
+  const result = mergeDiskAntigravitySession(previous, {
+    id: 'disk',
+    label: 'disk',
+    token: 'new-access',
+    refreshToken: 'new-refresh',
+    email: 'new@example.com',
+  }, 3000);
+  assert.equal(result.email, 'new@example.com');
+  assert.equal(result.capturedAccount?.token, 'new-access');
+  assert.equal(result.capturedAccount?.refreshToken, 'new-refresh');
+  assert.equal(result.credits, null);
+  assert.deepEqual(result.quotas, []);
 });
 
 test('add button is hidden for a case-insensitive monitored duplicate', () => {
