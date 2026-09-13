@@ -9,7 +9,9 @@ import {
   mergeLocalAntigravityStatus,
   canAddLocalSessionToMonitored,
   normalizeEmail,
+  normalizeLocalSessionQuotas,
 } from "../utils/antigravity/local-antigravity-session";
+import { aggregateCloudQuotasIntoPools } from "../utils/antigravity/antigravity-quota";
 import { extractAntigravitySessionAccount } from "../utils/antigravity/current-local-session";
 import { resolveAntigravityPlanName, ANTIGRAVITY_ORDER_KEY } from "../utils/common/app-constants";
 import { saveAntigravityAccounts } from "../utils/common/app-storage";
@@ -45,7 +47,7 @@ export const useLocalSession = (
           setLocalAntigravitySession((prev) => {
             const next: LocalAntigravitySession = {
               ...prev,
-              quotas: res.quotas,
+              quotas: aggregateCloudQuotasIntoPools(res.quotas),
               planTier: res.planTier ?? prev.planTier,
               online: true,
               lastSeenAt: Date.now(),
@@ -79,9 +81,10 @@ export const useLocalSession = (
         const previous = localAntigravitySessionRef.current;
         const previousEmail = normalizeEmail(previous.email ?? previous.capturedAccount?.email);
         const candidateEmail = normalizeEmail(candidate.email);
+        const normalizedPreviousQuotas = normalizeLocalSessionQuotas(previous.quotas);
         const shouldRefresh =
           previousEmail !== candidateEmail ||
-          previous.quotas.length === 0 ||
+          normalizedPreviousQuotas.length === 0 ||
           !previous.capturedAccount?.token;
         const next = mergeDiskAntigravitySession(previous, candidate);
         localAntigravitySessionRef.current = next;

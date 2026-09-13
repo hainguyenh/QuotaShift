@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   createEmptyLocalAntigravitySession,
   mergeDiskAntigravitySession,
   mergeLocalAntigravityStatus,
   canAddLocalSessionToMonitored,
+  normalizeLocalSessionQuotas,
 } from '../.test-build/local-antigravity-session.js';
 
 test('offline refresh retains the last captured identity and quota', () => {
@@ -122,15 +124,12 @@ test('loadLocalAntigravitySession and saveLocalAntigravitySession persist to loc
   };
 
   try {
-    // Empty storage
     const empty = loadLocalAntigravitySession();
     assert.equal(empty.online, false);
 
-    // Corrupted storage
     store.set(LOCAL_ANTIGRAVITY_SESSION_KEY, '{invalid');
     assert.equal(loadLocalAntigravitySession().online, false);
 
-    // Save and load
     const session = {
       email: 'saved@test.com',
       planTier: 'Pro',
@@ -142,7 +141,7 @@ test('loadLocalAntigravitySession and saveLocalAntigravitySession persist to loc
     saveLocalAntigravitySession(session);
     const loaded = loadLocalAntigravitySession();
     assert.equal(loaded.email, 'saved@test.com');
-    assert.equal(loaded.online, false); // always loaded as offline initially
+    assert.equal(loaded.online, false);
     assert.equal(loaded.quotas.length, 1);
   } finally {
     delete globalThis.localStorage;
@@ -171,3 +170,22 @@ test('resolveLocalSessionDisplayQuotas falls back to account quotas or returns e
   assert.deepEqual(resolveLocalSessionDisplayQuotas([], [], [], [], [], false), []);
 });
 
+test('drops legacy cloud-shaped local quota rows without a display model', () => {
+  const stale = normalizeLocalSessionQuotas([
+    { modelId: 'gemini_pool', displayName: 'Gemini Models', fiveHourPercent: 78, weeklyPercent: 80 },
+    { modelId: 'claude_and_gpt_pool', displayName: 'Claude & OpenAI Models', fiveHourPercent: 100, weeklyPercent: 67 },
+  ]);
+  assert.deepEqual(stale, []);
+
+  const valid = normalizeLocalSessionQuotas([
+    { model: 'Gemini Models', percent: 78, refreshTime: 'Ready', fiveHourPercent: 78, weeklyPercent: 80 },
+    { model: 'Claude & OpenAI Models', percent: 100, refreshTime: 'Ready', fiveHourPercent: 100, weeklyPercent: 67 },
+  ]);
+  assert.deepEqual(valid.map((quota) => quota.model), ['Gemini Models', 'Claude & OpenAI Models']);
+});
+
+test('local session refresh converts cloud quotas into display pools and refreshes stale cache', () => {
+  const source = readFileSync(new URL('../src/hooks/useLocalSession.ts', import.meta.url), 'utf8');
+  assert.match(source, /aggregateCloudQuotasIntoPools\(res\.quotas\)/);
+  assert.match(source, /normalizeLocalSessionQuotas\(previous\.quotas\)/);
+});

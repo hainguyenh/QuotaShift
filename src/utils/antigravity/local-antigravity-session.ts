@@ -13,6 +13,14 @@ export function createEmptyLocalAntigravitySession(): LocalAntigravitySession {
   };
 }
 
+export function normalizeLocalSessionQuotas(quotas: unknown[] | undefined | null): QuotaData[] {
+  return (quotas || []).filter((quota): quota is QuotaData => {
+    if (!quota || typeof quota !== "object") return false;
+    const model = (quota as Partial<QuotaData>).model;
+    return typeof model === "string" && model.trim().length > 0;
+  });
+}
+
 export function resolveLocalSessionDisplayQuotas(
   rawQuotas: QuotaData[] | undefined | null,
   cachedCloudQuotas: QuotaData[] | undefined | null,
@@ -21,7 +29,8 @@ export function resolveLocalSessionDisplayQuotas(
   accountCloudQuotas: QuotaData[] | undefined | null,
   isExactGrouped: boolean,
 ): QuotaData[] {
-  if (rawQuotas && rawQuotas.length > 0) return rawQuotas;
+  const normalizedRawQuotas = normalizeLocalSessionQuotas(rawQuotas);
+  if (normalizedRawQuotas.length > 0) return normalizedRawQuotas;
   if (isExactGrouped && cachedCloudQuotas && cachedCloudQuotas.length > 0) return cachedCloudQuotas;
   if (cachedQuotas && cachedQuotas.length > 0) return cachedQuotas;
   if (accountQuotas && accountQuotas.length > 0) return accountQuotas;
@@ -52,7 +61,7 @@ export function mergeDiskAntigravitySession(
     email: candidate.email ?? previous.email,
     planTier: candidate.lastPlan ?? previous.planTier,
     credits: sameIdentity ? previous.credits : null,
-    quotas: sameIdentity ? previous.quotas : [],
+    quotas: sameIdentity ? normalizeLocalSessionQuotas(previous.quotas) : [],
     online: true,
     lastSeenAt: now,
     capturedAccount: {
@@ -108,7 +117,7 @@ export function loadLocalAntigravitySession(): LocalAntigravitySession {
       ...createEmptyLocalAntigravitySession(),
       ...parsed,
       online: false,
-      quotas: Array.isArray(parsed.quotas) ? parsed.quotas : [],
+      quotas: normalizeLocalSessionQuotas(Array.isArray(parsed.quotas) ? parsed.quotas : []),
     };
   } catch {
     return createEmptyLocalAntigravitySession();
