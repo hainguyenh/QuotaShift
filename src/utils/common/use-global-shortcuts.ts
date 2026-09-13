@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { loadShortcutPreferences } from "./shortcuts";
+import { createShortcutRegistrationController } from "./shortcut-registration";
 
 export function useGlobalShortcuts(
   onToggleOverlay: () => void,
@@ -15,66 +16,33 @@ export function useGlobalShortcuts(
   });
 
   useEffect(() => {
-    let currentPrefs = loadShortcutPreferences();
-    let registeredKeys: string[] = [];
-
-    const applyShortcuts = async () => {
-      const { toggleOverlay, refreshAccount } = currentPrefs;
-      const nextKeys: string[] = [];
-      if (toggleOverlay) {
-        try {
-          await unregister(toggleOverlay).catch(() => {});
-          await register(toggleOverlay, (e) => {
-            if (e.state === "Pressed") {
-              toggleRef.current();
-            }
+    const controller = createShortcutRegistrationController(
+      {
+        register: async (shortcut, onPressed) => {
+          await register(shortcut, (event) => {
+            if (event.state === "Pressed") onPressed();
           });
-          nextKeys.push(toggleOverlay);
-          console.info("[QuotaShift] Registered toggleOverlay shortcut:", toggleOverlay);
-        } catch (err) {
-          console.error("Failed to register toggleOverlay shortcut:", toggleOverlay, err);
-        }
-      }
-      if (refreshAccount) {
-        try {
-          await unregister(refreshAccount).catch(() => {});
-          await register(refreshAccount, (e) => {
-            if (e.state === "Pressed") {
-              refreshRef.current();
-            }
-          });
-          nextKeys.push(refreshAccount);
-          console.info("[QuotaShift] Registered refreshAccount shortcut:", refreshAccount);
-        } catch (err) {
-          console.error("Failed to register refreshAccount shortcut:", refreshAccount, err);
-        }
-      }
-      registeredKeys = nextKeys;
-    };
+        },
+        unregister: async (shortcuts) => {
+          await unregister(shortcuts);
+        },
+      },
+      {
+        onToggleOverlay: () => toggleRef.current(),
+        onRefreshAccount: () => refreshRef.current(),
+      },
+    );
 
-    const cleanupShortcuts = async () => {
-      if (registeredKeys.length > 0) {
-        try {
-          await unregister(registeredKeys);
-        } catch (err) {
-          console.error("Failed to unregister shortcuts:", registeredKeys, err);
-        }
-        registeredKeys = [];
-      }
-    };
+    void controller.replace(loadShortcutPreferences());
 
-    applyShortcuts();
-
-    const handleChange = async () => {
-      await cleanupShortcuts();
-      currentPrefs = loadShortcutPreferences();
-      await applyShortcuts();
+    const handleChange = () => {
+      void controller.replace(loadShortcutPreferences());
     };
 
     window.addEventListener("quotashift_shortcuts_changed", handleChange);
     return () => {
       window.removeEventListener("quotashift_shortcuts_changed", handleChange);
-      void cleanupShortcuts();
+      void controller.dispose();
     };
   }, []);
 }
