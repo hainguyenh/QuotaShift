@@ -194,7 +194,7 @@ pub fn run() {
             secure_storage::secure_storage_load, secure_storage::secure_storage_set,
             secure_storage::secure_storage_delete, secure_storage::secure_storage_clear,
             get_quota_status, claude_monitor::ensure_claude_statusline_bridge,
-            claude_monitor::get_claude_monitor_status, force_refresh, set_monitored_model,
+            claude_monitor::get_claude_monitor_status, claude_monitor::kill_claude_processes, force_refresh, set_monitored_model,
             set_monitored_codex, set_poll_interval, is_debug, start_oauth_flow,
             exchange_oauth_token, fetch_chatgpt_workspaces, fetch_chatgpt_usage,
             fetch_chatgpt_rate_limit_reset_credits,

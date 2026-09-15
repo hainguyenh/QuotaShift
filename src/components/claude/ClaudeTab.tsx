@@ -1,97 +1,55 @@
 import React from "react";
-import type {
-  ClaudeMonitorStatus,
-  ClaudeObservedUsageWindow,
-  ClaudeRateLimitWindow,
-} from "../../utils/common/types";
+import type { ClaudeMonitorStatus } from "../../utils/common/types";
 import {
   clampPercent,
   formatPercent,
   formatTokens,
   formatDuration,
-  formatReset,
   formatCaptureTime,
 } from "../../utils/claude/claude-formatters";
+import { ClaudeControls } from "./ClaudeControls";
+import { UsageLane, LocalUsageCard, Stat, formatClaudeModelName } from "./ClaudeParts";
 
-interface ClaudeTabProps {
+export { formatClaudeModelName } from "./ClaudeParts";
+
+export interface ClaudeTabProps {
   status: ClaudeMonitorStatus;
   isTracked?: boolean;
   onTrackClaude?: () => void;
+  claudePollIntervalSecs?: number;
+  onClaudePollIntervalChange?: (secs: number) => void;
+  claudeStopThresholdPct?: number;
+  onClaudeStopThresholdChange?: (pct: number) => void;
+  autoStopArmed?: boolean;
 }
-
-const UsageLane: React.FC<{ label: string; window: ClaudeRateLimitWindow }> = ({
-  label,
-  window,
-}) => {
-  const used = window.usedPercentage;
-  return (
-    <div className="claude-usage-card">
-      <div className="claude-usage-header">
-        <span className="claude-usage-label">{label}</span>
-        <span className="claude-usage-value">
-          {used == null ? "Unavailable" : `${formatPercent(used)} used`}
-        </span>
-      </div>
-      {used != null && (
-        <div className="claude-progress" aria-hidden="true">
-          <div className="claude-progress-fill" style={{ width: `${clampPercent(used)}%` }} />
-        </div>
-      )}
-      <div className="claude-usage-meta">
-        <span>
-          {used == null
-            ? "Usage percentage unavailable"
-            : `${formatPercent(100 - clampPercent(used))} left`}
-        </span>
-        <span>{formatReset(window.resetsAt)}</span>
-      </div>
-    </div>
-  );
-};
-
-const LocalUsageCard: React.FC<{ label: string; usage: ClaudeObservedUsageWindow }> = ({
-  label,
-  usage,
-}) => (
-  <div className="claude-local-usage-card">
-    <div className="claude-local-usage-title">{label}</div>
-    <strong>{formatTokens(usage.processedTokens)} processed tokens</strong>
-    <div className="claude-local-usage-meta">
-      <span>{formatTokens(usage.outputTokens)} output</span>
-      <span>{usage.requestCount.toLocaleString()} requests</span>
-    </div>
-  </div>
-);
-
-const Stat: React.FC<{ label: string; value: string; visible?: boolean }> = ({
-  label,
-  value,
-  visible = true,
-}) => {
-  if (!visible) return null;
-  return (
-    <div className="claude-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-};
-
-export const formatClaudeModelName = (name: string | null | undefined): string => {
-  if (!name) return "Claude";
-  if (name === "claude-sonnet-5") return "Claude Sonnet  5";
-  return name.replace(/claude-sonnet-5/g, "Claude Sonnet  5");
-};
 
 export const ClaudeTab: React.FC<ClaudeTabProps> = ({
   status,
   isTracked = false,
   onTrackClaude,
+  claudePollIntervalSecs = 2,
+  onClaudePollIntervalChange,
+  claudeStopThresholdPct = 0,
+  onClaudeStopThresholdChange,
+  autoStopArmed = false,
 }) => {
+  const controls =
+    onClaudePollIntervalChange || onClaudeStopThresholdChange ? (
+      <ClaudeControls
+        claudePollIntervalSecs={claudePollIntervalSecs}
+        onClaudePollIntervalChange={onClaudePollIntervalChange}
+        claudeStopThresholdPct={claudeStopThresholdPct}
+        onClaudeStopThresholdChange={onClaudeStopThresholdChange}
+        autoStopArmed={autoStopArmed}
+      />
+    ) : null;
+
   if (!status) return null;
+
   if (status.error) {
     return (
       <section className="claude-monitor">
+        {controls}
         <div className="claude-monitor-card claude-monitor-state-card">
           <div className="claude-state-dot claude-state-dot--error" />
           <div>
@@ -106,6 +64,7 @@ export const ClaudeTab: React.FC<ClaudeTabProps> = ({
   if (!status.session) {
     return (
       <section className="claude-monitor">
+        {controls}
         <div className="claude-monitor-card claude-monitor-state-card">
           <div
             className={`claude-state-dot ${status.installed ? "claude-state-dot--ready" : ""}`}
@@ -154,10 +113,6 @@ export const ClaudeTab: React.FC<ClaudeTabProps> = ({
         </div>
         {status.localUsage && (
           <div className="claude-local-usage-section">
-            <div className="claude-section-heading">
-              <span>Local activity</span>
-              <span>Observed on this device</span>
-            </div>
             <div className="claude-local-usage-grid">
               <LocalUsageCard label="Last 5 hours" usage={status.localUsage.fiveHour} />
               <LocalUsageCard label="Last 7 days" usage={status.localUsage.sevenDay} />
@@ -181,6 +136,7 @@ export const ClaudeTab: React.FC<ClaudeTabProps> = ({
 
   return (
     <section className="claude-monitor">
+      {controls}
       <div className="claude-monitor-card claude-session-card">
         <div className="claude-session-heading">
           <div>
@@ -243,10 +199,6 @@ export const ClaudeTab: React.FC<ClaudeTabProps> = ({
 
       {status.localUsage && (
         <div className="claude-local-usage-section">
-          <div className="claude-section-heading">
-            <span>Local activity</span>
-            <span>Observed on this device</span>
-          </div>
           <div className="claude-local-usage-grid">
             <LocalUsageCard label="Last 5 hours" usage={status.localUsage.fiveHour} />
             <LocalUsageCard label="Last 7 days" usage={status.localUsage.sevenDay} />

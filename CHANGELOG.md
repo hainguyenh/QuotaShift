@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2026-09-15
+
+### Added
+
+- Claude guardrails with independent 5-hour and weekly stop thresholds, per-window switches, and a master enable/disable control.
+- Configurable guardrail polling with a 20-second default; while tracked and enabled, Claude uses its dedicated poll rate, otherwise tracking follows the global tracked-account rate.
+- Safe auto-stop for Claude Desktop and CLI; IDE integrations recycle only the Claude extension backend without closing the IDE.
+
 ## [1.0.4] - 2026-09-14
 
 ### Added

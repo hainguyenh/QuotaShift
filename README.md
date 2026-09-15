@@ -58,6 +58,8 @@ QuotaShift is a desktop application built with Tauri that tracks quota limits, r
 - Shows the active model, token velocity, context window percentage and size, estimated USD cost, run duration, and prompt cache hits.
 - Aggregates local token use over 5-hour and 7-day rolling windows.
 - Pin local Claude sessions to the desktop overlay with the Track button.
+- Optional Claude guardrails use independent 5-hour and weekly stop thresholds plus a dedicated poll rate; when disabled, Claude tracking follows the global tracked-account poll rate.
+- At a threshold, QuotaShift stops Claude Desktop/CLI and recycles only the Claude IDE-extension backend, leaving the IDE itself open.
 - Stores no credentials, runs no proxy, and makes no network requests to Anthropic.
 
 ### Dashboard and backups
