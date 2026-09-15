@@ -3,19 +3,20 @@ export const POLL_INTERVAL_LEGACY_KEY = "quotashift_poll_interval_secs";
 
 export const DEFAULT_POLL_INTERVAL_SECS = 30;
 export const MIN_POLL_INTERVAL_SECS = 5;
-export const MAX_POLL_INTERVAL_SECS = 3600;
+export const MAX_POLL_INTERVAL_SECS = 1200;
 
-// Tracked account poll rate: 30s to 120s recommended
+// Tracked account poll rate: 30s to 120s recommended, 5s to 20min allowed.
 export const TRACKED_POLL_INTERVAL_KEY = "quotashift_tracked_poll_interval_secs";
-export const DEFAULT_TRACKED_POLL_INTERVAL_SECS = 30; // 30s default
-export const MIN_TRACKED_POLL_INTERVAL_SECS = 30;
-export const MAX_TRACKED_POLL_INTERVAL_SECS = 120;
+export const TRACKED_POLL_INTERVAL_CHANGED_EVENT = "quotashift:tracked-poll-interval-changed";
+export const DEFAULT_TRACKED_POLL_INTERVAL_SECS = 30;
+export const MIN_TRACKED_POLL_INTERVAL_SECS = 5;
+export const MAX_TRACKED_POLL_INTERVAL_SECS = 1200;
 
-// Idle accounts poll rate: 5 mins (300s) to 15 mins (900s) recommended
+// Idle accounts poll rate: 5 to 15min recommended, 5s to 20min allowed.
 export const IDLE_POLL_INTERVAL_KEY = "quotashift_idle_poll_interval_secs";
-export const DEFAULT_IDLE_POLL_INTERVAL_SECS = 600; // 10 mins default (600s)
-export const MIN_IDLE_POLL_INTERVAL_SECS = 300; // 5 mins
-export const MAX_IDLE_POLL_INTERVAL_SECS = 900; // 15 mins
+export const DEFAULT_IDLE_POLL_INTERVAL_SECS = 600;
+export const MIN_IDLE_POLL_INTERVAL_SECS = 5;
+export const MAX_IDLE_POLL_INTERVAL_SECS = 1200;
 
 type StorageReader = Pick<Storage, "getItem">;
 type StorageWriter = Pick<Storage, "setItem">;
@@ -100,6 +101,9 @@ export function saveTrackedPollIntervalPreference(
   try {
     const sanitized = sanitizeTrackedPollInterval(interval);
     storage.setItem(TRACKED_POLL_INTERVAL_KEY, String(sanitized));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(TRACKED_POLL_INTERVAL_CHANGED_EVENT, { detail: sanitized }));
+    }
   } catch {}
 }
 
