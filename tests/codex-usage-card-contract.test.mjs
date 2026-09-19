@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { readWithCssImports } from './css-helper.mjs';
 
 // Source contracts keep the account card response-driven at the App/UI boundary.
-const read = (path) => fs.readFileSync(path, 'utf8');
+const read = (path) => readWithCssImports(path);
 
 const slice = (source, start, end) => {
   const from = source.indexOf(start);
@@ -15,10 +16,14 @@ const slice = (source, start, end) => {
 };
 
 test('Codex account cards render normalized response windows instead of plan heuristics', () => {
-  const tab = read('src/components/codex/CodexTab.tsx');
+  const tab =
+    read('src/components/codex/CodexTab.tsx') +
+    (fs.existsSync('src/components/codex/CodexAccountCard.tsx')
+      ? read('src/components/codex/CodexAccountCard.tsx')
+      : '');
 
   assert.match(tab, /normalizeCodexUsageWindows/);
-  assert.match(tab, /normalizeCodexUsageWindows\(cache\.rate_limit\)/);
+  assert.match(tab, /normalizeCodexUsageWindows\(\s*cache\.rate_limit,?\s*\)/);
   assert.doesNotMatch(tab, /getLimitLabel/);
   assert.doesNotMatch(tab, /reset_at\s*&&\s*cache\.primary\.reset_at\s*-\s*Date\.now/);
 });

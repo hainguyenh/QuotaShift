@@ -7,6 +7,7 @@ import {
   encryptBackup,
   decryptBackup,
 } from "../.test-build/common/app-backup.js";
+import { readWithCssImports } from "./css-helper.mjs";
 
 const mockStorage = new Map();
 globalThis.localStorage = {
@@ -247,7 +248,7 @@ test("encryptBackup and decryptBackup round-trip encrypted data", async () => {
 test("Export contracts: success shows dialog with Open in Explorer and target path", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
-  const appSrc = fs.readFileSync(path.resolve("src/App.tsx"), "utf-8");
+  const appSrc = readWithCssImports("src/App.tsx");
 
   assert.match(appSrc, /\[exportSuccessPath,\s*setExportSuccessPath\]\s*=\s*useState/);
   assert.match(appSrc, /setExportSuccessPath\(path\)/);
@@ -260,7 +261,7 @@ test("Export contracts: success shows dialog with Open in Explorer and target pa
 test("Import contracts: selecting a file triggers show_dashboard so dashboard panel opens immediately", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
-  const appSrc = fs.readFileSync(path.resolve("src/App.tsx"), "utf-8");
+  const appSrc = readWithCssImports("src/App.tsx");
   const headerSrc = fs.readFileSync(path.resolve("src/components/common/Header.tsx"), "utf-8");
 
   // App.tsx handles import with show_dashboard
@@ -291,7 +292,7 @@ test("Backend contracts: open_path_in_file_manager is cross-platform for Windows
 test("Import contracts: App.tsx calls restoreBackupData and updates accounts in state", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
-  const appSrc = fs.readFileSync(path.resolve("src/App.tsx"), "utf-8");
+  const appSrc = readWithCssImports("src/App.tsx");
 
   assert.match(appSrc, /restoreBackupData\(pData,\s*antigravityAccounts,\s*codexAccounts/);
   assert.match(appSrc, /setAntigravityAccounts\(res\.accounts\.antigravity\)/);

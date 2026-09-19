@@ -56,6 +56,23 @@ test('Codex parser extracts OAuth account id and email from auth.json', () => {
   assert.equal(oauth.accessToken, 'access-token');
 });
 
+test('Codex parser accepts raw auth.json text returned by the Tauri backend', () => {
+  const payload = Buffer.from(JSON.stringify({ email: 'drago@example.com' })).toString('base64url');
+  const account = parseCodexLocalAuth(JSON.stringify({
+    auth_mode: 'chatgpt',
+    tokens: {
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      account_id: 'acct-drago',
+      id_token: `header.${payload}.signature`,
+    },
+  }), 'Current Codex');
+
+  assert.equal(account?.id, 'acct-oauth-acct-drago');
+  assert.equal(account?.label, 'Current Codex');
+  assert.equal(account?.email, 'drago@example.com');
+});
+
 test('Codex parser imports API-key auth without inventing an email', () => {
   const account = parseCodexLocalAuth({
     auth_mode: 'openai_api_key',
@@ -72,4 +89,5 @@ test('Malformed provider sessions return null without throwing', () => {
   assert.equal(extractAntigravitySessionAccount({}), null);
   assert.equal(parseCodexLocalAuth(null), null);
   assert.equal(parseCodexLocalAuth({ auth_mode: 'unknown' }), null);
+  assert.equal(parseCodexLocalAuth('{not-json'), null);
 });

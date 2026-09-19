@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { readWithCssImports } from './css-helper.mjs';
 
-const read = (path) => fs.readFileSync(path, 'utf8');
+const read = (path) => readWithCssImports(path);
 
 const slice = (source, start, end) => {
   const from = source.indexOf(start);

@@ -4,11 +4,13 @@ import fs from "node:fs";
 
 import { readWithCssImports } from "./css-helper.mjs";
 import {
+  CLAUDE_AUTO_RESUME_AT_RESET_KEY,
   CLAUDE_FIVE_HOUR_STOP_ENABLED_KEY,
   CLAUDE_FIVE_HOUR_STOP_THRESHOLD_KEY,
   CLAUDE_GUARDRAILS_ENABLED_KEY,
   CLAUDE_GUARDRAILS_WINDOW_DRIVEN_KEY,
   CLAUDE_POLL_INTERVAL_KEY,
+  CLAUDE_PREFERENCES_CHANGED_EVENT,
   CLAUDE_STOP_THRESHOLD_KEY,
   CLAUDE_WEEKLY_STOP_ENABLED_KEY,
   CLAUDE_WEEKLY_STOP_THRESHOLD_KEY,
@@ -20,7 +22,14 @@ import {
 } from "../.test-build/common/claude-preferences.js";
 
 const exists = (path) => fs.existsSync(new URL(`../${path}`, import.meta.url));
-const read = (path) => readWithCssImports(new URL(`../${path}`, import.meta.url));
+const read = (path) => {
+  const content = readWithCssImports(new URL(`../${path}`, import.meta.url));
+  if (path === "src/components/overlay/OverlayApp.tsx") {
+    const cardPath = new URL("../src/components/overlay/OverlayCard.tsx", import.meta.url);
+    return content + (fs.existsSync(cardPath) ? readWithCssImports(cardPath) : "");
+  }
+  return content;
+};
 
 function createMockStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -64,9 +73,11 @@ test("Claude bridge remains local-only and does not introduce Claude auth or rem
 test("App keeps the existing Claude wiring while useClaudeMonitor enforces split guardrails", () => {
   const app = read("src/App.tsx");
   const hook = read("src/hooks/useClaudeMonitor.ts");
+  const accountHook = read("src/hooks/useClaudeAccountMonitor.ts");
+  const guardrails = read("src/utils/claude/claude-guardrails.ts");
 
   assert.match(app, /useState<"antigravity" \| "codex" \| "claude">/);
-  assert.match(app, /useClaudeMonitor\(showToast\)/);
+  assert.match(app, /useClaudeMonitor\(showToast, platformVisibility\.claude, idlePollInterval\)/);
   assert.match(app, /activeTab === "claude"/);
   assert.match(app, /<ClaudeTab\s+status=\{claudeMonitorStatus\}/);
   assert.match(app, /claudePollIntervalSecs=\{claudePollIntervalSecs\}/);
@@ -75,12 +86,20 @@ test("App keeps the existing Claude wiring while useClaudeMonitor enforces split
   assert.match(app, /onClaudeStopThresholdChange=\{handleClaudeStopThresholdChange\}/);
 
   assert.match(hook, /ensure_claude_statusline_bridge/);
-  assert.match(hook, /get_claude_monitor_status/);
-  assert.match(hook, /setInterval\(tick,\s*ms\)/);
-  assert.match(hook, /kill_claude_processes/);
-  assert.match(hook, /preferences\.fiveHour\.enabled/);
-  assert.match(hook, /preferences\.weekly\.enabled/);
-  assert.match(hook, /loadClaudePreferences\(\)/);
+  assert.doesNotMatch(hook, /get_claude_monitor_status/);
+  assert.match(hook, /useClaudeAccountMonitor/);
+  assert.doesNotMatch(hook, /window\.setInterval/);
+  assert.match(accountHook, /claudeAdaptivePollIntervalSecs/);
+  assert.match(accountHook, /window\.setTimeout/);
+  assert.match(accountHook, /claude-account-usage-updated/);
+  assert.match(accountHook, /maxAgeSecs/);
+  assert.doesNotMatch(accountHook, /activeRequestRef|pendingForceRef/);
+  assert.doesNotMatch(hook + accountHook, /invoke[^\n]*kill_claude_processes/);
+  assert.match(accountHook, /suspend_claude_account_processes/);
+  assert.match(accountHook, /resume_claude_account_processes/);
+  assert.match(guardrails, /preferences\.fiveHour\.enabled/);
+  assert.match(guardrails, /preferences\.weekly\.enabled/);
+  assert.match(accountHook, /loadClaudePreferences\(\)/);
 });
 
 test("Claude poll rate defaults to 20 seconds and allows 5 seconds through 20 minutes", () => {
@@ -95,7 +114,7 @@ test("Claude poll rate defaults to 20 seconds and allows 5 seconds through 20 mi
   assert.equal(loadClaudePreferences(legacyStorage).pollIntervalSecs, 5);
 });
 
-test("Claude guardrails persist independent 5-hour and weekly switches and thresholds", () => {
+test("Claude Code guardrails persist independent 5-hour and weekly switches and thresholds", () => {
   assert.equal(sanitizeClaudeStopThreshold(-1), 1);
   assert.equal(sanitizeClaudeStopThreshold(98), 98);
   assert.equal(sanitizeClaudeStopThreshold(101), 100);
@@ -111,6 +130,7 @@ test("Claude guardrails persist independent 5-hour and weekly switches and thres
   const preferences = {
     pollIntervalSecs: 20,
     enabled: true,
+    autoResumeAtReset: false,
     fiveHour: { enabled: true, thresholdPct: 96 },
     weekly: { enabled: false, thresholdPct: 92 },
   };
@@ -124,7 +144,59 @@ test("Claude guardrails persist independent 5-hour and weekly switches and thres
   assert.deepEqual(loadClaudePreferences(storage), preferences);
 });
 
-test("Claude guardrails migrate the legacy single threshold to both windows", () => {
+test("Claude preference save reports storage failure and still publishes in-session state", () => {
+  const preferences = loadClaudePreferences(createMockStorage());
+  assert.equal(saveClaudePreferences(preferences, createMockStorage()), true);
+
+  const previousWindow = globalThis.window;
+  const fakeWindow = new EventTarget();
+  let published = null;
+  fakeWindow.addEventListener(CLAUDE_PREFERENCES_CHANGED_EVENT, (event) => {
+    published = event.detail;
+  });
+  globalThis.window = fakeWindow;
+
+  try {
+    const next = {
+      ...preferences,
+      fiveHour: { ...preferences.fiveHour, enabled: true },
+    };
+    assert.equal(
+      saveClaudePreferences(next, {
+        setItem() {
+          throw new Error("storage unavailable");
+        },
+      }),
+      false,
+    );
+    assert.equal(published.fiveHour.enabled, true);
+  } finally {
+    if (previousWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = previousWindow;
+    }
+  }
+
+  const monitorHook = read("src/hooks/useClaudeMonitor.ts");
+  assert.match(monitorHook, /event instanceof CustomEvent/);
+  assert.match(monitorHook, /event\.detail/);
+});
+
+test("Claude auto-resume-at-reset defaults off and persists independently", () => {
+  const storage = createMockStorage();
+  const defaults = loadClaudePreferences(storage);
+  assert.equal(defaults.autoResumeAtReset, false);
+
+  saveClaudePreferences({ ...defaults, autoResumeAtReset: true }, storage);
+  const stored = loadClaudePreferences(storage);
+  assert.equal(stored.autoResumeAtReset, true);
+  assert.equal(stored.fiveHour.enabled, false);
+  assert.equal(stored.weekly.enabled, false);
+  assert.equal(storage.getItem(CLAUDE_AUTO_RESUME_AT_RESET_KEY), "true");
+});
+
+test("Claude Code guardrails migrate the legacy single threshold to both windows", () => {
   const storage = createMockStorage({ [CLAUDE_STOP_THRESHOLD_KEY]: "97" });
   const preferences = loadClaudePreferences(storage);
   assert.equal(preferences.enabled, true);
@@ -132,7 +204,7 @@ test("Claude guardrails migrate the legacy single threshold to both windows", ()
   assert.deepEqual(preferences.weekly, { enabled: true, thresholdPct: 97 });
 });
 
-test("Claude guardrails preserve a legacy master-off state until a window is explicitly enabled", () => {
+test("Claude Code guardrails preserve a legacy master-off state until a window is explicitly enabled", () => {
   const storage = createMockStorage({
     [CLAUDE_GUARDRAILS_ENABLED_KEY]: "false",
     [CLAUDE_FIVE_HOUR_STOP_ENABLED_KEY]: "true",
@@ -148,50 +220,138 @@ test("Claude guardrail controls expose independent 5-hour and weekly switches wi
   const controls = read("src/components/claude/ClaudeControls.tsx");
   const styles = read("src/styles.css");
 
-  assert.match(controls, /Claude guardrails/);
-  assert.match(controls, /5-hour stop %/);
-  assert.match(controls, /Weekly stop %/);
+  assert.match(controls, /Claude Code guardrails/);
+  assert.match(controls, /5-hour suspend %/);
+  assert.match(controls, /Weekly suspend %/);
   assert.match(controls, /role="switch"/);
   assert.match(controls, /Recommended 15–30s/);
-  assert.doesNotMatch(controls, /label="Enable Claude guardrails"/);
+  assert.match(controls, /Auto-resume at quota reset/);
+  assert.match(controls, /both guardrails turn off/);
+  assert.match(controls, /same suspended process/);
+  assert.doesNotMatch(controls, /label="Enable Claude Code guardrails"/);
   assert.doesNotMatch(controls, /disabled=\{!preferences\.enabled\}/);
   assert.match(controls, /codex-pool-switch/);
   assert.doesNotMatch(styles, /\.claude-guardrail-switch/);
 });
 
+test("Claude guardrail primary row gives auto-resume two thirds and poll controls one third", () => {
+  const controls = read("src/components/claude/ClaudeControls.tsx");
+  const styles = read("src/styles/claude.css");
+
+  assert.match(controls, /className="claude-guardrail-primary-row"/);
+  assert.match(controls, /className="claude-auto-resume-group"/);
+  assert.match(controls, /className="claude-poll-copy"/);
+  assert.match(
+    controls,
+    /claude-auto-resume-group[\s\S]*Auto-resume at quota reset[\s\S]*<GuardrailSwitch/,
+  );
+  assert.match(
+    controls,
+    /claude-poll-copy[\s\S]*Poll rate[\s\S]*Recommended 15–30s[\s\S]*claude-control-input/,
+  );
+  assert.match(controls, /claude-control-label--active/);
+  assert.match(styles, /\.claude-control-label--active/);
+  assert.doesNotMatch(controls, /className="claude-auto-resume-row"/);
+  assert.match(
+    styles,
+    /\.claude-guardrail-primary-row\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 2fr\) minmax\(0, 1fr\);/,
+  );
+  assert.match(
+    styles,
+    /\.claude-auto-resume-group\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/,
+  );
+  assert.match(
+    styles,
+    /\.claude-poll-control--inline\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
+  );
+  assert.match(
+    styles,
+    /\.claude-poll-copy\s*\{[\s\S]*flex-direction:\s*column;[\s\S]*align-items:\s*flex-start;/,
+  );
+  assert.match(
+    styles,
+    /\.claude-control-field\.claude-poll-control--inline\s*\{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/,
+  );
+  assert.match(
+    styles,
+    /\.claude-poll-control--inline \.claude-control-input\s*\{[\s\S]*width:\s*7ch;/,
+  );
+});
+
+test("collapsed Claude guardrail summary includes auto-resume toggle state", () => {
+  const controls = read("src/components/claude/ClaudeControls.tsx");
+
+  assert.match(controls, /Auto-resume:\s*\$\{preferences\.autoResumeAtReset \? "on" : "off"\}/);
+  assert.match(controls, /!detailsExpanded && getCollapsedGuardrailDescription\(preferences\)/);
+});
+
+test("Claude guardrail suspension is wired to native and in-app notification paths", () => {
+  const packageJson = read("package.json");
+  const cargo = read("src-tauri/Cargo.toml");
+  const capabilities = read("src-tauri/capabilities/default.json");
+  const lib = read("src-tauri/src/lib.rs");
+  const helper = read("src/utils/claude/claude-guardrail-notification.ts");
+  const hook = read("src/hooks/useClaudeAccountMonitor.ts");
+
+  assert.match(packageJson, /@tauri-apps\/plugin-notification/);
+  assert.match(cargo, /tauri-plugin-notification/);
+  assert.match(capabilities, /notification:default/);
+  assert.match(lib, /tauri_plugin_notification::init\(\)/);
+  assert.match(helper, /isPermissionGranted/);
+  assert.match(helper, /requestPermission/);
+  assert.match(helper, /sendNotification/);
+  assert.match(hook, /notifyClaudeGuardrailSuspension/);
+  assert.match(hook, /showToast\(message, "warning"\)/);
+  assert.match(hook, /Claude Code guardrails are now off/);
+});
+
 test("Claude tab uses neutral tab styling without a Claude-specific logo or active-border color", () => {
   const styles = read("src/styles.css");
   assert.doesNotMatch(styles, /\.tab-btn\[data-tab="claude"\][\s\S]{0,120}border-bottom-color/);
-  assert.doesNotMatch(styles, /\.tab-btn\[data-tab="claude"\][\s\S]{0,180}\.tab-brand-icon[\s\S]{0,80}color:/);
+  assert.doesNotMatch(
+    styles,
+    /\.tab-btn\[data-tab="claude"\][\s\S]{0,180}\.tab-brand-icon[\s\S]{0,80}color:/,
+  );
 });
 
-test("Claude auto-stop counts only successful targeted process kills", () => {
+test("Claude guardrails use account-scoped suspend/resume instead of process termination", () => {
   const process = read("src-tauri/src/claude/process.rs");
-  const hook = read("src/hooks/useClaudeMonitor.ts");
+  const native = read("src-tauri/src/claude/process/native.rs");
+  const classify = read("src-tauri/src/claude/process/classify.rs");
+  const hook = read("src/hooks/useClaudeAccountMonitor.ts");
 
-  assert.match(process, /if\s+process\.kill\(\)\s*\{/);
-  assert.doesNotMatch(process, /taskkill[\s\S]{0,180}\/[Ii][Mm]/);
-  assert.match(process, /#\[serde\(rename_all\s*=\s*"camelCase"\)\]/);
-  assert.doesNotMatch(hook, /no running Claude processes found/i);
+  assert.match(process, /suspend_claude_account_processes/);
+  assert.match(process, /resume_claude_account_processes/);
+  assert.match(native, /NtSuspendProcess/);
+  assert.match(native, /NtResumeProcess/);
+  assert.match(classify, /is_claude_usage_probe/);
+  assert.match(hook, /"suspend_claude_account_processes"/);
+  assert.match(hook, /"resume_claude_account_processes"/);
+  assert.doesNotMatch(hook, /kill_claude_processes|process\.kill\(/);
 });
 
-test("ClaudeTab is read-only and contains no account-management controls", () => {
+test("ClaudeTab keeps usage-only account cards without switching or credential actions", () => {
   assert.equal(exists("src/components/claude/ClaudeTab.tsx"), true, "ClaudeTab.tsx must exist");
   const tab = read("src/components/claude/ClaudeTab.tsx");
+  const cards = read("src/components/claude/ClaudeAccountCards.tsx");
+
   assert.match(tab, /ClaudeMonitorStatus/);
-  assert.match(tab, /5-hour|5 hour|5 Hour/i);
-  assert.match(tab, /7-day|7 day|Weekly/i);
-  assert.match(tab, /Context/i);
-  assert.match(tab, /Session/i);
-  assert.doesNotMatch(tab, /Add Account|onAddAccount|switch account|onApply|Apply best|onDelete|onRename|login/i);
+  assert.match(tab, /ClaudeAccountCards/);
+  assert.match(cards, /fullLabel="5h"/);
+  assert.match(cards, /fullLabel="Weekly"/);
+  assert.match(cards, /MonitoredHeartbeatIcon/);
+  assert.doesNotMatch(cards, /ClaudeAccountDetails|aria-expanded|claude-account-monitor-btn/);
+  assert.doesNotMatch(tab + cards, /switch account|onApply|Apply best|onDelete|onRename|login/i);
 });
 
 test("Claude types and scoped styles are present", () => {
   const types = read("src/utils/common/types.ts");
+  const accountTypes = read("src/utils/claude/claude-account-types.ts");
   const styles = read("src/styles.css");
   assert.match(types, /interface ClaudeRateLimitWindow/);
   assert.match(types, /interface ClaudeSessionSnapshot/);
   assert.match(types, /interface ClaudeMonitorStatus/);
+  assert.match(accountTypes, /interface ClaudeAccountUsageStatus/);
   assert.match(styles, /\.claude-monitor/);
   assert.match(styles, /\.claude-usage-grid/);
   assert.match(styles, /\.claude-stat-grid/);
@@ -205,73 +365,79 @@ test("Claude snapshot persistence stores only normalized monitoring fields and u
   assert.doesNotMatch(backend, /fs::write\(&path,\s*raw\.as_bytes\(\)\)/);
 });
 
-test("Claude monitor exposes hybrid local transcript usage without reading conversation content", () => {
+test("Claude transcript monitor infrastructure remains narrow but is no longer polled by account cards", () => {
   const backend = read("src-tauri/src/claude/monitor.rs");
-  const types = read("src/utils/common/types.ts");
-  const tab = read("src/components/claude/ClaudeTab.tsx");
-  const parts = read("src/components/claude/ClaudeParts.tsx");
+  const accounts = read("src-tauri/src/claude/accounts.rs");
+  const cards = read("src/components/claude/ClaudeAccountCards.tsx");
 
   assert.match(backend, /scan_local_transcripts_at/);
-  assert.match(backend, /~?\.claude|join\("\.claude"\)/);
   const recordStart = backend.indexOf("struct LocalTranscriptRecord");
   const recordEnd = backend.indexOf("struct LocalAssistantMessage");
   assert.ok(recordStart >= 0 && recordEnd > recordStart, "narrow transcript structs must exist");
   assert.doesNotMatch(backend.slice(recordStart, recordEnd), /content\s*:/i);
-
-  assert.match(types, /type ClaudeMonitorSource\s*=\s*"statusLine"\s*\|\s*"localTranscript"\s*\|\s*"none"/);
-  assert.match(types, /interface ClaudeObservedUsageWindow/);
-  assert.match(types, /interface ClaudeObservedUsage/);
-  assert.match(types, /localUsage:\s*ClaudeObservedUsage\s*\|\s*null/);
-
-  assert.match(tab, /Local activity/i);
-  assert.match(parts, /processed tokens/i);
-  assert.match(tab, /Exact Claude plan-limit percentages/i);
-  assert.doesNotMatch(tab, /current session will appear after Claude Code emits its next status update/i);
+  assert.doesNotMatch(accounts, /get_claude_account_details|scan_local_transcripts_at/);
+  assert.doesNotMatch(cards, /get_claude_account_details|ClaudeAccountDetails/);
 });
 
-test("Claude monitor extracts CLI usage fallback and replaces model name with Claude Sonnet  5", () => {
+test("Claude monitor keeps CLI usage fallback and model normalization helpers", () => {
   const backend = read("src-tauri/src/claude/monitor.rs");
-  const tab = read("src/components/claude/ClaudeTab.tsx");
-  const parts = read("src/components/claude/ClaudeParts.tsx");
+  const formatters = read("src/utils/claude/claude-formatters.ts");
 
   assert.match(backend, /pub\s+fn\s+extract_cli_usage_from_output\s*\(/);
   assert.match(backend, /pub\s+fn\s+run_claude_cli_usage\s*\(/);
   assert.match(backend, /pub\s+fn\s+format_claude_model_name\s*\(/);
   assert.match(backend, /"claude-sonnet-5"/);
   assert.match(backend, /"Claude Sonnet  5"/);
-
-  assert.match(tab, /formatClaudeModelName/);
-  assert.match(parts, /"Claude Sonnet  5"/);
+  assert.match(formatters, /"Claude Sonnet  5"/);
 });
 
-test("ClaudeTab exposes Track Claude button and wires local session tracking to desktop overlay", () => {
+test("Claude account cards expose Monitor and wire account-specific tracking to desktop overlay", () => {
   const tab = read("src/components/claude/ClaudeTab.tsx");
+  const cards = read("src/components/claude/ClaudeAccountCards.tsx");
   const app = read("src/App.tsx");
   const overlay = read("src/components/overlay/OverlayApp.tsx");
-  const styles = read("src/styles.css");
+  const usageOverlay = read("src/hooks/useAppUsageAndOverlay.ts");
 
-  assert.match(tab, /isTracked\?:\s*boolean/);
-  assert.match(tab, /onTrackClaude\?:\s*\(\)\s*=>\s*void/);
-  assert.match(tab, /Track Claude/);
-  assert.match(tab, /claude-track-btn/);
+  assert.match(tab, /onTrackClaudeAccount\?:\s*\(status:\s*ClaudeAccountUsageStatus\)\s*=>\s*void/);
+  assert.match(cards, /onDoubleClick=\{\(\) => onMonitor\?\.\(status\)\}/);
+  assert.match(cards, /MonitoredHeartbeatIcon/);
+  assert.doesNotMatch(tab, /onTrackClaude\?:\s*\(\)\s*=>\s*void/);
 
-  assert.match(app, /handleTrackClaude/);
-  assert.match(app, /localStorage\.setItem\(OVERLAY_TRACKED_PROVIDER_KEY,\s*["']claude["']\)/);
-  assert.match(app, /localStorage\.setItem\(OVERLAY_TRACKED_ACCOUNT_ID_KEY,\s*["']claude-local["']\)/);
-  assert.match(app, /provider:\s*["']claude["']/);
-  assert.match(app, /<ClaudeTab[\s\S]*?isTracked=\{trackedProvider === ["']claude["']\}[\s\S]*?onTrackClaude=\{handleTrackClaude\}/);
+  assert.match(app, /onTrackClaudeAccount=\{handleTrackClaude\}/);
+  assert.match(usageOverlay, /const accountId = status\.account\.id/);
+  assert.match(usageOverlay, /localStorage\.setItem\(OVERLAY_TRACKED_PROVIDER_KEY,\s*"claude"\)/);
+  assert.match(
+    usageOverlay,
+    /localStorage\.setItem\(OVERLAY_TRACKED_ACCOUNT_ID_KEY,\s*accountId\)/,
+  );
+  assert.match(usageOverlay, /isClaudeTracked\s*=\s*savedTrackedProvider\s*===\s*"claude"/);
+  assert.match(usageOverlay, /[REDACTED]/);
 
-  assert.match(overlay, /provider:\s*["']antigravity["']\s*\|\s*["']codex["']\s*\|\s*["']claude["']/);
+  assert.match(
+    overlay,
+    /provider:\s*["']antigravity["']\s*\|\s*["']codex["']\s*\|\s*["']claude["']/,
+  );
   assert.match(overlay, /data\.provider === ["']claude["'][\s\S]{0,180}<ClaudeLogo size=\{22\}/);
-
-  assert.match(styles, /\.claude-track-btn/);
-  assert.match(styles, /\.glass-card--claude/);
 });
 
 test("Claude monitor spawns CLI usage and shell commands silently on Windows without flashing console windows", () => {
   const backend = read("src-tauri/src/claude/monitor.rs");
 
-  assert.match(backend, /#\[cfg\(target_os\s*=\s*"windows"\)\]\s*use\s+std::os::windows::process::CommandExt;/);
+  assert.match(
+    backend,
+    /#\[cfg\(target_os\s*=\s*"windows"\)\]\s*use\s+std::os::windows::process::CommandExt;/,
+  );
   assert.match(backend, /run_shell_command[\s\S]*?creation_flags\(0x08000000\)/);
   assert.match(backend, /run_claude_cli_usage[\s\S]*?creation_flags\(0x08000000\)/);
+});
+
+test("Claude metric cards use wrapping fit-content flow", () => {
+  const styles = read("src/styles/claude.css");
+  assert.match(
+    styles,
+    /\.claude-usage-grid,[\s\S]*\.claude-local-usage-grid,[\s\S]*\.claude-stat-grid\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-wrap:\s*wrap;/,
+  );
+  assert.match(styles, /\.claude-local-usage-card\s*\{[\s\S]*width:\s*fit-content;/);
+  assert.match(styles, /\.claude-context-card\s*\{[\s\S]*width:\s*fit-content;/);
+  assert.match(styles, /\.claude-stat\s*\{[\s\S]*width:\s*fit-content;/);
 });

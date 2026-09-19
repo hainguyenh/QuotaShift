@@ -44,7 +44,11 @@ test('member selection uses the approved custom accessible checkbox artwork', ()
 });
 
 test('Codex account card exposes a Show available models icon action before Apply', () => {
-  const tab = read('src/components/codex/CodexTab.tsx');
+  const tab =
+    read('src/components/codex/CodexTab.tsx') +
+    (fs.existsSync('src/components/codex/CodexAccountCard.tsx')
+      ? read('src/components/codex/CodexAccountCard.tsx')
+      : '');
   assert.match(tab, /CodexAvailableModelsDialog/);
   assert.match(tab, /data-tooltip="Show available models"/);
   assert.match(tab, /onShowAvailableModels|availableModelsAccount/);

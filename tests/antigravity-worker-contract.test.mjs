@@ -49,7 +49,7 @@ test('Tauri registers worker manager and lifecycle commands', () => {
 
 test('enabling persistent mode waits for the next explicit refresh', () => {
   const start = app.indexOf('const handleTogglePersistentWorkers');
-  const end = app.indexOf('// Poll Interval Changed', start);
+  const end = app.indexOf('const handlePollIntervalChange', start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
   const toggleHandler = app.slice(start, end);

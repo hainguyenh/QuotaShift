@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { readWithCssImports } from "./css-helper.mjs";
 
-const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+const app = readWithCssImports("src/App.tsx");
 
 test("App discovers and tracks the current Antigravity local session", () => {
   assert.match(app, /handleTrackCurrentAntigravityAccount\s*=\s*async/);
@@ -22,7 +23,8 @@ test("App imports and tracks the current Codex local session even when cloud usa
   assert.match(app, /findCodexAccountMatch/);
   assert.match(app, /saveCodexAccounts/);
   assert.match(app, /saveAccountOrder\(CODEX_ORDER_KEY/);
-  assert.match(app, /fetchAccountUsage\(account, true\)/);
+  assert.match(app, /handleTrackCodexAccount\(account\)/);
+  assert.match(app, /handleTrackCodexAccount[\s\S]*?fetchAccountUsage\(acc, true\)/);
   assert.match(app, /set_monitored_codex/);
   assert.match(app, /cloud usage unavailable/);
 });

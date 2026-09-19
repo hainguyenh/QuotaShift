@@ -2,7 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf-8");
+const read = (path) => {
+  const content = fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf-8");
+  if (path === "src/components/overlay/OverlayApp.tsx") {
+    const menuPath = new URL("../src/components/overlay/OverlayContextMenu.tsx", import.meta.url);
+    return content + (fs.existsSync(menuPath) ? fs.readFileSync(menuPath, "utf-8") : "");
+  }
+  return content;
+};
 
 test("App.tsx uses useGlobalShortcuts hook to manage dynamic shortcuts", () => {
   const appTsx = read("src/App.tsx");
@@ -18,21 +25,21 @@ test("App.tsx uses useGlobalShortcuts hook to manage dynamic shortcuts", () => {
     /import.*register.*@tauri-apps\/plugin-global-shortcut/,
     "Hook must import register from global-shortcut plugin",
   );
+  assert.match(hookTs, /isRegistered/, "Hook must reclaim shortcuts left by a WebView reload");
   assert.match(hookTs, /quotashift_shortcuts_changed/, "Hook must listen for shortcut changes");
 });
 
-test("OverlayApp.tsx keeps clean context menu without text clutter", () => {
+test("OverlayApp.tsx keeps the context menu icon-only with action tooltips", () => {
   const overlayTsx = read("src/components/overlay/OverlayApp.tsx");
-  assert.match(
-    overlayTsx,
-    /<span>Hide overlay<\/span>/,
-    "Context menu must have clean Hide overlay label",
-  );
-  assert.match(
-    overlayTsx,
-    /<span>Refresh usage<\/span>/,
-    "Context menu must have clean Refresh usage label",
-  );
+  for (const label of ["Refresh usage", "Open dashboard", "Hide overlay"]) {
+    assert.match(overlayTsx, new RegExp(`data-tooltip="${label}"`));
+    assert.match(overlayTsx, new RegExp(`aria-label="${label}"`));
+  }
+  assert.doesNotMatch(overlayTsx, /<span>Refresh usage<\/span>/);
+  assert.doesNotMatch(overlayTsx, /<span>Open dashboard<\/span>/);
+  assert.doesNotMatch(overlayTsx, /<span>Hide overlay<\/span>/);
+  assert.match(overlayTsx, /Switch to light mode/);
+  assert.match(overlayTsx, /Switch to dark mode/);
 });
 
 test("SettingsModal.tsx includes ShortcutSettings section for rebinding", () => {

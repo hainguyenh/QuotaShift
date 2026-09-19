@@ -1,9 +1,18 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
+
+import fs from "node:fs";
 
 import { readWithCssImports } from "./css-helper.mjs";
 
-const read = (path) => readWithCssImports(new URL(`../${path}`, import.meta.url));
+const read = (path) => {
+  const content = readWithCssImports(new URL(`../${path}`, import.meta.url));
+  if (path === "src/components/overlay/OverlayApp.tsx") {
+    const cardPath = new URL("../src/components/overlay/OverlayCard.tsx", import.meta.url);
+    return content + (fs.existsSync(cardPath) ? readWithCssImports(cardPath) : "");
+  }
+  return content;
+};
 
 function inputTagByLabel(source, label) {
   const marker = `aria-label="${label}"`;
@@ -19,9 +28,9 @@ function inputTagByLabel(source, label) {
 test("Claude guardrail numeric fields stay editable regardless of switch state", () => {
   const controls = read("src/components/claude/ClaudeControls.tsx");
 
-  const pollInput = inputTagByLabel(controls, "Claude guardrail poll interval in seconds");
-  const fiveHourInput = inputTagByLabel(controls, "Claude 5-hour auto-stop threshold percent");
-  const weeklyInput = inputTagByLabel(controls, "Claude weekly auto-stop threshold percent");
+  const pollInput = inputTagByLabel(controls, "Claude Code guardrail poll interval in seconds");
+  const fiveHourInput = inputTagByLabel(controls, "Claude Code 5-hour auto-suspend threshold percent");
+  const weeklyInput = inputTagByLabel(controls, "Claude Code weekly auto-suspend threshold percent");
 
   assert.doesNotMatch(pollInput, /\bdisabled\s*=/);
   assert.doesNotMatch(fiveHourInput, /\bdisabled\s*=/);
@@ -31,11 +40,11 @@ test("Claude guardrail numeric fields stay editable regardless of switch state",
   assert.match(controls, /commitThreshold\("weekly", weeklyDraft\)/);
 });
 
-test("Claude guardrails are active from either window switch without a master switch", () => {
+test("Claude Code guardrails are active from either window switch without a master switch", () => {
   const controls = read("src/components/claude/ClaudeControls.tsx");
   const hook = read("src/hooks/useClaudeMonitor.ts");
 
-  assert.doesNotMatch(controls, /label="Enable Claude guardrails"/);
+  assert.doesNotMatch(controls, /label="Enable Claude Code guardrails"/);
   assert.doesNotMatch(controls, /disabled=\{!preferences\.enabled\}/);
   assert.match(controls, /preferences\.fiveHour\.enabled\s*\|\|\s*preferences\.weekly\.enabled/);
   assert.match(
@@ -49,6 +58,7 @@ test("Claude guardrails are active from either window switch without a master sw
 test("Claude overlay payload carries each enabled guardrail threshold without master gating", () => {
   const helper = read("src/utils/common/app-overlay-helpers.ts");
   const preferences = read("src/utils/common/claude-preferences.ts");
+  const overlaySync = read("src/utils/common/claude-overlay-sync.ts");
   const types = read("src/utils/common/overlay-types.ts");
 
   assert.match(types, /claudeGuardrails\?/);
@@ -64,8 +74,8 @@ test("Claude overlay payload carries each enabled guardrail threshold without ma
   );
   assert.match(helper, /fiveHourThresholdPct:\s*preferences\.fiveHour\.thresholdPct/);
   assert.match(helper, /weeklyThresholdPct:\s*preferences\.weekly\.thresholdPct/);
-  assert.match(preferences, /quotashift_overlay_data/);
-  assert.match(preferences, /claudeGuardrails/);
+  assert.match(overlaySync, /quotashift_overlay_data/);
+  assert.match(overlaySync, /claudeGuardrails/);
 });
 
 test("Claude overlay uses Claude logo avatar and percentage-only outline guardrails", () => {
@@ -93,18 +103,18 @@ test("Claude overlay uses Claude logo avatar and percentage-only outline guardra
   assert.match(styles, /\.overlay-guardrail-badge--weekly\s*\{[\s\S]*bottom:[\s\S]*right:/);
 });
 
-test("Claude guardrail tooltips describe the configured stop threshold", () => {
+test("Claude guardrail tooltips describe the configured suspend threshold", () => {
   const tooltip = read("src/utils/common/overlay-tooltip.ts");
 
   assert.match(tooltip, /guardrail_five_hour/);
   assert.match(tooltip, /guardrail_weekly/);
   assert.match(
     tooltip,
-    /Claude'll be stopped when hit \$\{data\.claudeGuardrails\.fiveHourThresholdPct\}% of 5 hrs limit/,
+    /Claude Code account will be suspended when usage reaches \$\{data\.claudeGuardrails\.fiveHourThresholdPct\}% of 5 hrs/,
   );
   assert.match(
     tooltip,
-    /Claude'll be stopped when hit \$\{data\.claudeGuardrails\.weeklyThresholdPct\}% of weekly limit/,
+    /Claude Code account will be suspended when usage reaches \$\{data\.claudeGuardrails\.weeklyThresholdPct\}% of weekly/,
   );
   assert.match(tooltip, /\.overlay-guardrail-badge--five-hour/);
   assert.match(tooltip, /\.overlay-guardrail-badge--weekly/);

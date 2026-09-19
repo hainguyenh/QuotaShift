@@ -48,7 +48,11 @@ test("decodeJwtProfile and decodeJwtEmail return null on invalid tokens", () => 
 });
 
 test("CodexTab renders avatar img when available and initial letter fallback", () => {
-  const code = fs.readFileSync("src/components/codex/CodexTab.tsx", "utf8");
+  const code =
+    fs.readFileSync("src/components/codex/CodexTab.tsx", "utf8") +
+    (fs.existsSync("src/components/codex/CodexAccountCard.tsx")
+      ? fs.readFileSync("src/components/codex/CodexAccountCard.tsx", "utf8")
+      : "");
 
   assert.match(code, /acc\.profileUrl/);
   assert.match(code, /decodeJwtProfile/);
