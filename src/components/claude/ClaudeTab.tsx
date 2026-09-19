@@ -1,38 +1,70 @@
-import React from "react";
-import type { ClaudeMonitorStatus } from "../../utils/common/types";
-import {
-  clampPercent,
-  formatPercent,
-  formatTokens,
-  formatDuration,
-  formatCaptureTime,
-} from "../../utils/claude/claude-formatters";
+import React, { useMemo, useState } from "react";
+import type { ClaudeAccountUsageStatus, ClaudeMonitorStatus } from "../../utils/common/types";
+import { TrackCurrentAccountIcon } from "../common/TrackCurrentAccountIcon";
 import { ClaudeControls } from "./ClaudeControls";
-import { UsageLane, LocalUsageCard, Stat, formatClaudeModelName } from "./ClaudeParts";
-
-export { formatClaudeModelName } from "./ClaudeParts";
+import { ClaudeAccountCards } from "./ClaudeAccountCards";
+import { ClaudeAddAccountModal } from "./ClaudeAddAccountModal";
 
 export interface ClaudeTabProps {
   status: ClaudeMonitorStatus;
   isTracked?: boolean;
-  onTrackClaude?: () => void;
+  trackedAccountId?: string | null;
+  onTrackClaudeAccount?: (status: ClaudeAccountUsageStatus) => void | Promise<void>;
+  onTrackCurrentAccount?: () => void | Promise<void>;
+  isTrackingCurrentAccount?: boolean;
+  onAddProfilePath?: (configDir: string) => Promise<void>;
+  searchQuery?: string;
   claudePollIntervalSecs?: number;
   onClaudePollIntervalChange?: (secs: number) => void;
   claudeStopThresholdPct?: number;
   onClaudeStopThresholdChange?: (pct: number) => void;
   autoStopArmed?: boolean;
+  accountStatuses?: ClaudeAccountUsageStatus[];
+  onResumeAccount?: (configDir: string) => void;
+}
+
+const AddAccountIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="10" height="10" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+function matchesClaudeAccount(status: ClaudeAccountUsageStatus, query?: string): boolean {
+  const normalized = (query || "").trim().toLowerCase();
+  if (!normalized) return true;
+  const account = status.account;
+  return [
+    account.email,
+    account.organizationName,
+    account.profileName,
+    account.configDir,
+    account.subscriptionType,
+    account.rateLimitTier,
+  ].some((value) => value?.toLowerCase().includes(normalized));
 }
 
 export const ClaudeTab: React.FC<ClaudeTabProps> = ({
   status,
   isTracked = false,
-  onTrackClaude,
+  trackedAccountId = null,
+  onTrackClaudeAccount,
+  onTrackCurrentAccount,
+  isTrackingCurrentAccount = false,
+  onAddProfilePath,
+  searchQuery,
   claudePollIntervalSecs = 2,
   onClaudePollIntervalChange,
   claudeStopThresholdPct = 0,
   onClaudeStopThresholdChange,
   autoStopArmed = false,
+  accountStatuses = [],
+  onResumeAccount,
 }) => {
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const filteredAccounts = useMemo(
+    () => accountStatuses.filter((account) => matchesClaudeAccount(account, searchQuery)),
+    [accountStatuses, searchQuery],
+  );
   const controls =
     onClaudePollIntervalChange || onClaudeStopThresholdChange ? (
       <ClaudeControls
@@ -44,231 +76,82 @@ export const ClaudeTab: React.FC<ClaudeTabProps> = ({
       />
     ) : null;
 
-  if (!status) return null;
+  return (
+    <section className="claude-monitor">
+      <div className="account-bar">
+        <div className="account-bar-actions">
+          {onAddProfilePath && (
+            <button
+              type="button"
+              className="account-action-btn account-action-btn--add"
+              onClick={() => setAddAccountOpen(true)}
+              data-tooltip="Add a Claude Code profile by CLAUDE_CONFIG_DIR path"
+            >
+              <AddAccountIcon />
+              Add Account
+            </button>
+          )}
+          {onTrackCurrentAccount && (
+            <button
+              type="button"
+              className="account-action-btn account-action-btn--icon-only"
+              onClick={() => void onTrackCurrentAccount()}
+              disabled={isTrackingCurrentAccount}
+              aria-label="Monitor Current Claude Code Account"
+              data-tooltip="Monitor the account used by the current Claude Code process"
+            >
+              <TrackCurrentAccountIcon />
+            </button>
+          )}
+        </div>
+      </div>
 
-  if (status.error) {
-    return (
-      <section className="claude-monitor">
-        {controls}
+      {controls}
+
+      <ClaudeAccountCards
+        accounts={filteredAccounts}
+        trackedAccountId={trackedAccountId}
+        isClaudeTracked={isTracked}
+        onMonitor={onTrackClaudeAccount}
+        onResume={onResumeAccount}
+      />
+
+      {accountStatuses.length > 0 && filteredAccounts.length === 0 && (
         <div className="claude-monitor-card claude-monitor-state-card">
-          <div className="claude-state-dot claude-state-dot--error" />
-          <div>
-            <div className="claude-state-title">Claude local monitor needs attention</div>
-            <div className="claude-state-copy">{status.error}</div>
+          <div className="claude-state-dot" />
+          <div className="claude-state-content">
+            <div className="claude-state-title">No Claude Code accounts match this search</div>
+            <div className="claude-state-copy">Try another email, profile name, path, or tier.</div>
           </div>
         </div>
-      </section>
-    );
-  }
+      )}
 
-  if (!status.session) {
-    return (
-      <section className="claude-monitor">
-        {controls}
+      {!accountStatuses.length && (
         <div className="claude-monitor-card claude-monitor-state-card">
           <div
-            className={`claude-state-dot ${status.installed ? "claude-state-dot--ready" : ""}`}
+            className={`claude-state-dot ${status.error ? "claude-state-dot--error" : status.installed ? "claude-state-dot--ready" : ""}`}
           />
           <div className="claude-state-content">
             <div className="claude-state-title">
-              {status.localUsage
-                ? "No active Claude session detected"
-                : "No local Claude Code activity found yet"}
+              {status.error
+                ? "Claude Code account monitoring needs attention"
+                : "No Claude Code accounts found"}
             </div>
             <div className="claude-state-copy">
-              {status.localUsage ? (
-                "Showing recent local token activity observed on this device. Detailed session and model statistics will appear here when an active Claude session runs."
-              ) : (
-                <>
-                  QuotaShift monitors local Claude Code and Claude Desktop Code activity stored on
-                  this device. Claude.ai web-only usage is not exposed through a documented local
-                  API.
-                  {!status.installed &&
-                    " The Claude status-line bridge is not confirmed, but local Desktop/Code activity will still appear when available."}
-                </>
-              )}
+              {status.error ||
+                "QuotaShift will show discovered Claude Code subscription accounts here when local profile data is available."}
             </div>
-          </div>
-          {onTrackClaude && (
-            <div className="claude-state-actions">
-              <button
-                type="button"
-                className={`claude-track-btn ${isTracked ? "claude-track-btn--active" : ""}`}
-                onClick={onTrackClaude}
-                title="Monitor local Claude usage"
-                data-tooltip="Monitor local Claude usage"
-                aria-label={
-                  isTracked
-                    ? "Claude is currently tracked on desktop overlay"
-                    : "Track Claude session on desktop overlay"
-                }
-              >
-                <span
-                  className={`claude-track-dot ${isTracked ? "claude-track-dot--active" : ""}`}
-                />
-                Track
-              </button>
-            </div>
-          )}
-        </div>
-        {status.localUsage && (
-          <div className="claude-local-usage-section">
-            <div className="claude-local-usage-grid">
-              <LocalUsageCard label="Last 5 hours" usage={status.localUsage.fiveHour} />
-              <LocalUsageCard label="Last 7 days" usage={status.localUsage.sevenDay} />
-            </div>
-          </div>
-        )}
-      </section>
-    );
-  }
-
-  const session = status.session;
-  const isLocalTranscript = status.source === "localTranscript";
-  const rawModel = session.modelDisplayName || session.modelId || "Claude";
-  const model = formatClaudeModelName(rawModel);
-  const contextUsed = session.contextUsedPercentage;
-  const contextRemaining =
-    session.contextRemainingPercentage ??
-    (contextUsed == null ? null : 100 - clampPercent(contextUsed));
-  const project = session.projectDir || session.currentDir || "Unknown project";
-  const hasExactPlanUsage = Boolean(session.fiveHour || session.sevenDay);
-
-  return (
-    <section className="claude-monitor">
-      {controls}
-      <div className="claude-monitor-card claude-session-card">
-        <div className="claude-session-heading">
-          <div>
-            <div className="claude-eyebrow">
-              {isLocalTranscript ? "Current local Claude session" : "Current Claude Code session"}
-            </div>
-            <div className="claude-session-model">{model}</div>
-          </div>
-          <div className="claude-session-actions">
-            {onTrackClaude && (
-              <button
-                type="button"
-                className={`claude-track-btn ${isTracked ? "claude-track-btn--active" : ""}`}
-                onClick={onTrackClaude}
-                title="Monitor local Claude usage"
-                data-tooltip="Monitor local Claude usage"
-                aria-label={
-                  isTracked
-                    ? "Claude is currently tracked on desktop overlay"
-                    : "Track Claude session on desktop overlay"
-                }
-              >
-                <span
-                  className={`claude-track-dot ${isTracked ? "claude-track-dot--active" : ""}`}
-                />
-                Track
-              </button>
-            )}
-            <div className="claude-capture-badge">
-              <span className="claude-state-dot claude-state-dot--ready" />
-              {isLocalTranscript
-                ? "Local activity"
-                : `Captured ${formatCaptureTime(session.capturedAtMs)}`}
-            </div>
-          </div>
-        </div>
-        <div className="claude-session-meta">
-          <span title={project}>{project}</span>
-          <span>{session.sessionName || `Session ${session.sessionId.slice(0, 12)}`}</span>
-          {session.claudeCodeVersion && <span>Claude Code {session.claudeCodeVersion}</span>}
-          {isLocalTranscript && <span>{formatCaptureTime(session.capturedAtMs)}</span>}
-        </div>
-      </div>
-
-      {hasExactPlanUsage ? (
-        <div className="claude-usage-grid">
-          {session.fiveHour && (
-            <UsageLane label="5-hour subscription usage" window={session.fiveHour} />
-          )}
-          {session.sevenDay && (
-            <UsageLane label="7-day subscription usage" window={session.sevenDay} />
-          )}
-        </div>
-      ) : (
-        <div className="claude-monitor-card claude-plan-note">
-          Exact Claude plan-limit percentages are only exposed locally by Claude Code statusLine.
-          QuotaShift is showing observed local token activity instead.
-        </div>
-      )}
-
-      {status.localUsage && (
-        <div className="claude-local-usage-section">
-          <div className="claude-local-usage-grid">
-            <LocalUsageCard label="Last 5 hours" usage={status.localUsage.fiveHour} />
-            <LocalUsageCard label="Last 7 days" usage={status.localUsage.sevenDay} />
           </div>
         </div>
       )}
 
-      <div className="claude-monitor-card claude-context-card">
-        <div className="claude-section-heading">
-          <span>Context</span>
-          <span>
-            {contextUsed == null
-              ? "Current local token counts"
-              : `${formatPercent(contextUsed)} used / ${formatPercent(contextRemaining)} left`}
-          </span>
-        </div>
-        {contextUsed != null && (
-          <div className="claude-progress claude-progress--context" aria-hidden="true">
-            <div
-              className="claude-progress-fill"
-              style={{ width: `${clampPercent(contextUsed)}%` }}
-            />
-          </div>
-        )}
-        <div className="claude-context-tokens">
-          <span>{formatTokens(session.totalInputTokens)} input</span>
-          <span>{formatTokens(session.totalOutputTokens)} output</span>
-          {session.contextWindowSize != null && (
-            <span>{formatTokens(session.contextWindowSize)} window</span>
-          )}
-        </div>
-      </div>
-
-      <div className="claude-stat-grid">
-        <Stat
-          label="Session cost"
-          value={session.totalCostUsd != null ? `$${session.totalCostUsd.toFixed(2)}` : "--"}
-          visible={session.totalCostUsd != null}
+      {onAddProfilePath && (
+        <ClaudeAddAccountModal
+          isOpen={addAccountOpen}
+          onClose={() => setAddAccountOpen(false)}
+          onAdd={onAddProfilePath}
         />
-        <Stat
-          label="Session duration"
-          value={formatDuration(session.totalDurationMs)}
-          visible={session.totalDurationMs != null}
-        />
-        <Stat
-          label="API duration"
-          value={formatDuration(session.totalApiDurationMs)}
-          visible={session.totalApiDurationMs != null}
-        />
-        <Stat
-          label="Current input"
-          value={formatTokens(session.currentInputTokens)}
-          visible={session.currentInputTokens != null}
-        />
-        <Stat
-          label="Current output"
-          value={formatTokens(session.currentOutputTokens)}
-          visible={session.currentOutputTokens != null}
-        />
-        <Stat
-          label="Cache read"
-          value={formatTokens(session.cacheReadInputTokens)}
-          visible={session.cacheReadInputTokens != null}
-        />
-        <Stat
-          label="Cache write"
-          value={formatTokens(session.cacheCreationInputTokens)}
-          visible={session.cacheCreationInputTokens != null}
-        />
-      </div>
+      )}
     </section>
   );
 };
