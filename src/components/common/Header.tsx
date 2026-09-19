@@ -1,12 +1,15 @@
 import React, { useRef, useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import logo from "../../../assets/icons/quota-shift-logo.png";
-import {
-  UpdateIcon,
-  RefreshIcon,
-  GearIcon,
-} from "./HeaderIcons";
+import { emitTo } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import logoDarkTheme from "../../../assets/icons/quota-shift-logo-512.png";
+import logoLightTheme from "../../../assets/icons/quota-shift-logo-dark-512.png";
+import { UpdateIcon, RefreshIcon, GearIcon } from "./HeaderIcons";
 import { SettingsModal } from "./SettingsModal";
+import { WindowControls } from "./WindowControls";
+import { WindowResizeHandles } from "./WindowResizeHandles";
+import { QuitButton } from "./QuitButton";
+import { useMainWindowZoom } from "../../hooks/useMainWindowZoom";
 import {
   loadTrackedPollIntervalPreference,
   saveTrackedPollIntervalPreference,
@@ -14,50 +17,14 @@ import {
   saveIdlePollIntervalPreference,
   savePollIntervalPreference,
 } from "../../utils/common/poll-interval";
-
-interface CodexModelScanProgress {
-  running: boolean;
-  total: number;
-  completed: number;
-  succeeded: number;
-  failed: number;
-}
-
-interface HeaderProps {
-  updateAvailable: boolean;
-  updateTag: string;
-  isDownloadingUpdate: boolean;
-  onTriggerUpdate: () => void;
-  // tracked poll (seconds)
-  trackedPollInterval?: number;
-  onTrackedPollIntervalChange?: (val: number) => void;
-  // idle poll (seconds)
-  idlePollInterval?: number;
-  onIdlePollIntervalChange?: (val: number) => void;
-  pollInterval?: number;
-  onPollIntervalChange?: (val: number) => void;
-  isRefreshing: boolean;
-  onRefresh: () => void;
-  onExportBackup: () => void;
-  onImportBackup: (content: string) => void;
-  isDarkMode: boolean;
-  onToggleTheme: () => void;
-  isOnline: boolean;
-  statusText: string;
-  keepAliveActive: boolean;
-  onToggleKeepAlive: () => void;
-  persistentWorkersEnabled: boolean;
-  onTogglePersistentWorkers: () => void;
-  codexModelScanProgress: CodexModelScanProgress;
-  onRescanAllCodexModels: () => void;
-  overlayEnabled?: boolean;
-  onToggleOverlay?: () => void;
-  searchQuery?: string;
-  onSearchChange?: (query: string) => void;
-  cardLayoutMode?: "compact" | "expanded";
-  onCardLayoutModeChange?: (mode: "compact" | "expanded") => void;
-}
-
+import {
+  UI_ADJUSTMENT_EVENT,
+  loadUiAdjustmentPreferences,
+  normalizeUiAdjustmentPreferences,
+  saveUiAdjustmentPreferences,
+  type UiAdjustmentPreferences,
+} from "../../utils/common/ui-adjustment";
+import { type HeaderProps } from "./header-types";
 export const Header: React.FC<HeaderProps> = ({
   updateAvailable,
   updateTag,
@@ -89,33 +56,51 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange: propOnSearchChange,
   cardLayoutMode,
   onCardLayoutModeChange,
+  platformVisibility,
+  onPlatformVisibilityChange,
 }) => {
+  useMainWindowZoom();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
+  const [uiAdjustment, setUiAdjustment] = useState<UiAdjustmentPreferences>(() =>
+    loadUiAdjustmentPreferences(),
+  );
   const isSearchControlled = propSearchQuery !== undefined;
   const searchQuery = isSearchControlled ? propSearchQuery : internalSearchQuery;
-
+  const win = getCurrentWindow();
+  const [trackedPollInterval, setTrackedPollInterval] = useState(() =>
+    propTrackedPollInterval !== undefined
+      ? propTrackedPollInterval
+      : loadTrackedPollIntervalPreference(),
+  );
+  const [idlePollInterval, setIdlePollInterval] = useState(() =>
+    propIdlePollInterval !== undefined ? propIdlePollInterval : loadIdlePollIntervalPreference(),
+  );
+  useEffect(() => {
+    if (propTrackedPollInterval !== undefined) setTrackedPollInterval(propTrackedPollInterval);
+  }, [propTrackedPollInterval]);
+  useEffect(() => {
+    if (propIdlePollInterval !== undefined) setIdlePollInterval(propIdlePollInterval);
+  }, [propIdlePollInterval]);
+  useEffect(() => {
+    const normalized = normalizeUiAdjustmentPreferences(uiAdjustment);
+    if (JSON.stringify(normalized) !== JSON.stringify(uiAdjustment)) {
+      setUiAdjustment(normalized);
+      return;
+    }
+    const appTheme = isDarkMode ? "dark" : "light";
+    const livePayload = { ...normalized, appTheme };
+    saveUiAdjustmentPreferences(normalized);
+    void Promise.allSettled([
+      emitTo("overlay", UI_ADJUSTMENT_EVENT, livePayload),
+      emitTo("overlay-tooltip", UI_ADJUSTMENT_EVENT, livePayload),
+    ]);
+  }, [uiAdjustment, isDarkMode]);
   const handleSearchChange = (val: string) => {
     if (!isSearchControlled) setInternalSearchQuery(val);
     propOnSearchChange?.(val);
   };
-
-  const [trackedPollInterval, setTrackedPollInterval] = useState(() =>
-    propTrackedPollInterval !== undefined ? propTrackedPollInterval : loadTrackedPollIntervalPreference()
-  );
-  const [idlePollInterval, setIdlePollInterval] = useState(() =>
-    propIdlePollInterval !== undefined ? propIdlePollInterval : loadIdlePollIntervalPreference()
-  );
-
-  useEffect(() => {
-    if (propTrackedPollInterval !== undefined) setTrackedPollInterval(propTrackedPollInterval);
-  }, [propTrackedPollInterval]);
-
-  useEffect(() => {
-    if (propIdlePollInterval !== undefined) setIdlePollInterval(propIdlePollInterval);
-  }, [propIdlePollInterval]);
-
   const handleTrackedPollIntervalChange = (val: number) => {
     setTrackedPollInterval(val);
     saveTrackedPollIntervalPreference(val);
@@ -123,50 +108,59 @@ export const Header: React.FC<HeaderProps> = ({
     propOnTrackedPollIntervalChange?.(val);
     _onPollIntervalChange?.(val);
   };
-
   const handleIdlePollIntervalChange = (val: number) => {
     setIdlePollInterval(val);
     saveIdlePollIntervalPreference(val);
     propOnIdlePollIntervalChange?.(val);
   };
-
   useEffect(() => {
     const input = fileInputRef.current;
     if (!input) return;
-    const onCancel = () => { invoke("show_dashboard").catch(() => {}); };
+    const onCancel = () => {
+      invoke("show_dashboard").catch(() => {});
+    };
     input.addEventListener("cancel", onCancel);
     return () => input.removeEventListener("cancel", onCancel);
   }, []);
-
-  const handleImportClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
-    }
+  const handleHeaderMouseDown = (event: React.MouseEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,select,textarea,a,[data-no-window-drag]")) return;
+    void win.startDragging().catch(() => {});
   };
-
+  const handleImportClick = () => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = "";
+    fileInputRef.current.click();
+  };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const content = evt.target?.result as string;
-      if (content) {
-        try { await invoke("show_dashboard"); } catch {}
-        onImportBackup(content);
-      }
+      if (!content) return;
+      try {
+        await invoke("show_dashboard");
+      } catch {}
+      onImportBackup(content);
     };
     reader.readAsText(file);
   };
-
   return (
-    <header className="app-header">
-      <div className="header-logo">
-        <img className="logo-icon" src={logo} alt="QuotaShift Logo" />
-        <span className="app-title">QuotaShift</span>
+    <header className="app-header" onMouseDown={handleHeaderMouseDown}>
+      <div className="header-logo header-drag-region" data-tauri-drag-region>
+        <img
+          className="logo-icon"
+          src={isDarkMode ? logoDarkTheme : logoLightTheme}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+        />
+        <span className="app-title" data-tauri-drag-region>
+          QuotaShift
+        </span>
       </div>
-
       <div className="header-search">
         <svg
           className="header-search-icon"
@@ -184,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({
         <input
           type="text"
           className="header-search-input"
-          placeholder="Search by name or email..."
+          placeholder="Search accounts..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           onKeyDown={(e) => {
@@ -200,14 +194,22 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => handleSearchChange("")}
             title="Clear search"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="10" height="10">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              width="10"
+              height="10"
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         )}
       </div>
-
       <div className="header-right">
         {updateAvailable && (
           <button
@@ -222,7 +224,6 @@ export const Header: React.FC<HeaderProps> = ({
             <UpdateIcon />
           </button>
         )}
-
         <button
           className={`refresh-btn ${isRefreshing ? "spinning" : ""}`}
           onClick={onRefresh}
@@ -231,7 +232,6 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <RefreshIcon />
         </button>
-
         <button
           className={`gear-menu-btn ${settingsOpen ? "gear-menu-btn--active" : ""}`}
           onClick={() => setSettingsOpen(true)}
@@ -239,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <GearIcon />
         </button>
-
+        <QuitButton />
         <input
           type="file"
           ref={fileInputRef}
@@ -247,13 +247,13 @@ export const Header: React.FC<HeaderProps> = ({
           accept=".json,.enc"
           style={{ display: "none" }}
         />
-
         <div className={`status-indicator ${!isOnline ? "offline" : ""}`} id="status-indicator">
-          <span className="status-dot"></span>
+          <span className="status-dot" />
           <span className="status-text">{statusText}</span>
         </div>
+        <div className="window-controls-divider" aria-hidden="true" />
+        <WindowControls />
       </div>
-
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -264,13 +264,9 @@ export const Header: React.FC<HeaderProps> = ({
         idlePollInterval={idlePollInterval}
         onIdlePollIntervalChange={handleIdlePollIntervalChange}
         keepAliveActive={keepAliveActive}
-        onToggleKeepAlive={() => {
-          onToggleKeepAlive();
-        }}
+        onToggleKeepAlive={onToggleKeepAlive}
         persistentWorkersEnabled={persistentWorkersEnabled}
-        onTogglePersistentWorkers={() => {
-          onTogglePersistentWorkers();
-        }}
+        onTogglePersistentWorkers={onTogglePersistentWorkers}
         overlayEnabled={overlayEnabled}
         onToggleOverlay={onToggleOverlay}
         codexModelScanProgress={codexModelScanProgress}
@@ -288,7 +284,12 @@ export const Header: React.FC<HeaderProps> = ({
         }}
         cardLayoutMode={cardLayoutMode}
         onCardLayoutModeChange={onCardLayoutModeChange}
+        platformVisibility={platformVisibility}
+        onPlatformVisibilityChange={onPlatformVisibilityChange}
+        uiAdjustment={uiAdjustment}
+        onUiAdjustmentChange={setUiAdjustment}
       />
+      <WindowResizeHandles />
     </header>
   );
 };

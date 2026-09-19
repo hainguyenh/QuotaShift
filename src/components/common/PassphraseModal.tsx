@@ -23,6 +23,13 @@ export const PassphraseModal: React.FC<PassphraseModalProps> = ({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
 
   const handleSubmit = () => {
     if (!passphrase) {

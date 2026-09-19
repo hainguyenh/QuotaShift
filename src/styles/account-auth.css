@@ -1,0 +1,26 @@
+.account-reauth-btn {
+  align-self: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 4px;
+  background: rgba(248, 113, 113, 0.06);
+  color: #f87171;
+  cursor: pointer;
+}
+
+.account-reauth-btn:hover {
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.account-reauth-btn svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}

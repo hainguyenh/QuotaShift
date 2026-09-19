@@ -1,0 +1,117 @@
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  height: 38px;
+  margin-right: -10px;
+  flex-shrink: 0;
+}
+
+.window-controls-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-color);
+  margin: 7px 6px;
+  flex-shrink: 0;
+}
+
+.window-control-btn {
+  width: 34px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.window-control-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+[data-theme="light"] .window-control-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+.window-control-btn--close:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+}
+
+.header-drag-region {
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.window-resize-handles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.window-resize-handle {
+  position: fixed;
+  pointer-events: auto;
+}
+
+.window-resize-handle--north {
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 4px;
+  cursor: n-resize;
+}
+.window-resize-handle--south {
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 4px;
+  cursor: s-resize;
+}
+.window-resize-handle--east {
+  top: 8px;
+  right: 0;
+  bottom: 8px;
+  width: 4px;
+  cursor: e-resize;
+}
+.window-resize-handle--west {
+  top: 8px;
+  left: 0;
+  bottom: 8px;
+  width: 4px;
+  cursor: w-resize;
+}
+.window-resize-handle--northeast {
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  cursor: ne-resize;
+}
+.window-resize-handle--northwest {
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  cursor: nw-resize;
+}
+.window-resize-handle--southeast {
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  cursor: se-resize;
+}
+.window-resize-handle--southwest {
+  left: 0;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  cursor: sw-resize;
+}
+
+:root[data-window-maximized="true"] .app-container {
+  border-radius: 0;
+}
