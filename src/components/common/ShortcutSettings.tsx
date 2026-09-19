@@ -7,6 +7,7 @@ import {
   DEFAULT_SHORTCUT_TOGGLE_OVERLAY,
   DEFAULT_SHORTCUT_REFRESH_ACCOUNT,
 } from "../../utils/common/shortcuts";
+import { ShortcutOverlayIcon, ShortcutRefreshIcon } from "./SettingsIcons";
 
 export const ShortcutSettings: React.FC = () => {
   const [prefs, setPrefs] = useState(loadShortcutPreferences);
@@ -70,11 +71,16 @@ export const ShortcutSettings: React.FC = () => {
 
       {/* Toggle Overlay */}
       <div
-        className={`settings-shortcut-row ${!prefs.toggleOverlayEnabled ? "settings-shortcut-row--disabled" : ""}`}
+        className={`settings-toggle-row settings-toggle-row--segmented settings-shortcut-row ${!prefs.toggleOverlayEnabled ? "settings-shortcut-row--disabled" : ""}`}
       >
-        <div className="settings-shortcut-info">
-          <div className="settings-shortcut-label">Toggle Overlay</div>
-          <div className="settings-shortcut-hint">Show or hide the desktop overlay</div>
+        <span className="settings-row-icon">
+          <ShortcutOverlayIcon />
+        </span>
+        <div className="settings-toggle-copy settings-shortcut-info">
+          <div className="settings-toggle-label settings-shortcut-label">Toggle overlay</div>
+          <div className="settings-toggle-description settings-shortcut-hint">
+            Show or hide the desktop overlay
+          </div>
         </div>
         <div className="settings-shortcut-controls">
           <button
@@ -133,11 +139,16 @@ export const ShortcutSettings: React.FC = () => {
 
       {/* Refresh Current Account */}
       <div
-        className={`settings-shortcut-row ${!prefs.refreshAccountEnabled ? "settings-shortcut-row--disabled" : ""}`}
+        className={`settings-toggle-row settings-toggle-row--segmented settings-shortcut-row ${!prefs.refreshAccountEnabled ? "settings-shortcut-row--disabled" : ""}`}
       >
-        <div className="settings-shortcut-info">
-          <div className="settings-shortcut-label">Refresh Usage</div>
-          <div className="settings-shortcut-hint">Refresh tracked account quota</div>
+        <span className="settings-row-icon">
+          <ShortcutRefreshIcon />
+        </span>
+        <div className="settings-toggle-copy settings-shortcut-info">
+          <div className="settings-toggle-label settings-shortcut-label">Refresh usage</div>
+          <div className="settings-toggle-description settings-shortcut-hint">
+            Refresh monitored account quota
+          </div>
         </div>
         <div className="settings-shortcut-controls">
           <button

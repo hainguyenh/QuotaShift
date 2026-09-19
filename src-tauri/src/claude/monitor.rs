@@ -3,14 +3,19 @@ pub mod cli;
 pub mod payload;
 pub mod status;
 pub mod transcript;
+mod transcript_cache;
+pub mod transcript_index;
 pub mod types;
+pub mod usage_scheduler;
 
 pub use bridge::*;
 pub use cli::*;
 pub use payload::*;
 pub use status::*;
 pub use transcript::*;
+pub use transcript_index::*;
 pub use types::*;
+pub use usage_scheduler::*;
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -60,7 +65,7 @@ pub fn claude_projects_path() -> Result<PathBuf, String> {
 }
 
 pub fn scan_local_transcripts_at(projects_root: &Path, now: DateTime<Utc>) -> LocalTranscriptScan {
-    transcript::scan_local_transcripts_internal(projects_root, now)
+    transcript_index::scan_incremental_transcripts(projects_root, now)
 }
 
 fn normalize_payload(value: &Value, captured_at_ms: u64) -> Result<ClaudeSessionSnapshot, String> {
@@ -92,14 +97,15 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 
 fn write_snapshot(raw: &str) -> Result<(), String> {
     let value: Value = serde_json::from_str(raw)
-        .map_err(|error| format!("Claude statusLine payload was not valid JSON: {error}"))?;
+        .map_err(|error| format!("Claude Code statusLine payload was not valid JSON: {error}"))?;
     let captured_at_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0);
     let snapshot = normalize_payload(&value, captured_at_ms)?;
-    let bytes = serde_json::to_vec_pretty(&snapshot)
-        .map_err(|error| format!("Failed to serialize local Claude session snapshot: {error}"))?;
+    let bytes = serde_json::to_vec_pretty(&snapshot).map_err(|error| {
+        format!("Failed to serialize local Claude Code session snapshot: {error}")
+    })?;
     write_atomic(&snapshot_path()?, &bytes)
 }
 
@@ -112,7 +118,9 @@ fn run_shell_command(command: &str, input: &str) -> Result<String, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|error| format!("Failed to start previous Claude statusLine command: {error}"))?;
+        .map_err(|error| {
+            format!("Failed to start previous Claude Code statusLine command: {error}")
+        })?;
 
     #[cfg(not(target_os = "windows"))]
     let mut child = Command::new("sh")
@@ -121,19 +129,21 @@ fn run_shell_command(command: &str, input: &str) -> Result<String, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|error| format!("Failed to start previous Claude statusLine command: {error}"))?;
+        .map_err(|error| {
+            format!("Failed to start previous Claude Code statusLine command: {error}")
+        })?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(input.as_bytes())
-            .map_err(|error| format!("Failed to forward Claude statusLine payload: {error}"))?;
+        stdin.write_all(input.as_bytes()).map_err(|error| {
+            format!("Failed to forward Claude Code statusLine payload: {error}")
+        })?;
     }
 
     let output = child.wait_with_output().map_err(|error| {
-        format!("Failed to wait for previous Claude statusLine command: {error}")
+        format!("Failed to wait for previous Claude Code statusLine command: {error}")
     })?;
     if !output.status.success() {
-        return Err("Previous Claude statusLine command exited unsuccessfully".to_string());
+        return Err("Previous Claude Code statusLine command exited unsuccessfully".to_string());
     }
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
@@ -201,12 +211,19 @@ pub fn extract_cli_usage_from_output(
 }
 
 pub fn run_claude_cli_usage() -> Result<String, String> {
+    run_claude_cli_usage_for_config(None)
+}
+
+pub fn run_claude_cli_usage_for_config(config_dir: Option<&Path>) -> Result<String, String> {
     let run = |cmd_name: &str, args: &[&str]| -> io::Result<std::process::Output> {
         let mut cmd = Command::new(cmd_name);
         cmd.args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if let Some(config_dir) = config_dir {
+            cmd.env("CLAUDE_CONFIG_DIR", config_dir);
+        }
         #[cfg(target_os = "windows")]
         {
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -231,7 +248,7 @@ pub fn run_claude_cli_usage() -> Result<String, String> {
     let output =
         run("claude", &["-p", "/usage"]).or_else(|_| run("sh", &["-lc", "claude -p /usage"]));
 
-    let output = output.map_err(|e| format!("Failed to run claude -p /usage: {e}"))?;
+    let output = output.map_err(|error| format!("Failed to run claude -p /usage: {error}"))?;
     if !output.status.success() {
         return Err(format!(
             "claude -p /usage exited with code {:?}: {}",
@@ -256,9 +273,9 @@ pub fn run_claude_statusline_bridge() -> Result<(), String> {
     let mut input = String::new();
     io::stdin()
         .read_to_string(&mut input)
-        .map_err(|error| format!("Failed to read Claude statusLine stdin: {error}"))?;
+        .map_err(|error| format!("Failed to read Claude Code statusLine stdin: {error}"))?;
     let value: Value = serde_json::from_str(&input)
-        .map_err(|error| format!("Claude statusLine payload was not valid JSON: {error}"))?;
+        .map_err(|error| format!("Claude Code statusLine payload was not valid JSON: {error}"))?;
 
     write_snapshot(&input)?;
 

@@ -24,13 +24,17 @@ export function findAntigravityAccountMatch(
 ): AntigravityAccount | undefined {
   const email = normalizeAccountIdentity(candidate.email);
   if (email) {
-    const emailMatch = accounts.find((account) => normalizeAccountIdentity(account.email) === email);
+    const emailMatch = accounts.find(
+      (account) => normalizeAccountIdentity(account.email) === email,
+    );
     if (emailMatch) return emailMatch;
   }
 
   const refreshToken = credentialValue(candidate.refreshToken);
   if (refreshToken) {
-    const refreshMatch = accounts.find((account) => credentialValue(account.refreshToken) === refreshToken);
+    const refreshMatch = accounts.find(
+      (account) => credentialValue(account.refreshToken) === refreshToken,
+    );
     if (refreshMatch) return refreshMatch;
   }
 
@@ -44,18 +48,24 @@ export function findCodexAccountMatch(
 ): CodexAccount | undefined {
   const candidateAccountId = codexAccountId(candidate);
   if (candidateAccountId) {
-    const accountIdMatch = accounts.find((account) => codexAccountId(account) === candidateAccountId);
+    const accountIdMatch = accounts.find(
+      (account) => codexAccountId(account) === candidateAccountId,
+    );
     if (accountIdMatch) return accountIdMatch;
   }
 
   const email = normalizeAccountIdentity(candidate.email);
   if (email) {
-    const emailMatch = accounts.find((account) => normalizeAccountIdentity(account.email) === email);
+    const emailMatch = accounts.find(
+      (account) => normalizeAccountIdentity(account.email) === email,
+    );
     if (emailMatch) return emailMatch;
   }
 
   const credential = credentialValue(candidate.apiKey);
-  return credential ? accounts.find((account) => credentialValue(account.apiKey) === credential) : undefined;
+  return credential
+    ? accounts.find((account) => credentialValue(account.apiKey) === credential)
+    : undefined;
 }
 
 export function upsertAccountById<T extends { id: string }>(accounts: T[], account: T): T[] {

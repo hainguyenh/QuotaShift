@@ -318,6 +318,102 @@ fn transcript_latest_main_session_maps_context_metadata() {
 }
 
 #[test]
+fn incremental_transcript_scan_reads_only_appended_usage_without_recounting() {
+    use std::io::Write as _;
+
+    let root = transcript_test_root("incremental-append");
+    let file = root.join("project").join("session.jsonl");
+    write_transcript(
+        &file,
+        &[transcript_record(
+            "first",
+            "2026-09-09T10:00:00Z",
+            1,
+            2,
+            3,
+            4,
+        )],
+    );
+
+    let first = scan_local_transcripts_at(&root, utc("2026-09-09T12:00:00Z"));
+    assert_eq!(
+        first
+            .observed_usage
+            .as_ref()
+            .unwrap()
+            .five_hour
+            .request_count,
+        1
+    );
+
+    let mut handle = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&file)
+        .unwrap();
+    writeln!(
+        handle,
+        "{}",
+        serde_json::to_string(&transcript_record(
+            "second",
+            "2026-09-09T11:00:00Z",
+            10,
+            20,
+            30,
+            40,
+        ))
+        .unwrap()
+    )
+    .unwrap();
+
+    let second = scan_local_transcripts_at(&root, utc("2026-09-09T12:00:00Z"));
+    let usage = second.observed_usage.unwrap().five_hour;
+    assert_eq!(usage.request_count, 2);
+    assert_eq!(usage.processed_tokens, 110);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn incremental_transcript_scan_preserves_partial_jsonl_tail_until_newline() {
+    use std::io::Write as _;
+
+    let root = transcript_test_root("incremental-partial");
+    let file = root.join("project").join("session.jsonl");
+    let record = serde_json::to_string(&transcript_record(
+        "partial",
+        "2026-09-09T11:00:00Z",
+        10,
+        20,
+        30,
+        40,
+    ))
+    .unwrap();
+    let split = record.len() / 2;
+    fs::write(&file, &record[..split]).unwrap();
+
+    let first = scan_local_transcripts_at(&root, utc("2026-09-09T12:00:00Z"));
+    assert!(first.observed_usage.is_none());
+
+    let mut handle = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&file)
+        .unwrap();
+    writeln!(handle, "{}", &record[split..]).unwrap();
+
+    let second = scan_local_transcripts_at(&root, utc("2026-09-09T12:00:00Z"));
+    let usage = second.observed_usage.unwrap().five_hour;
+    assert_eq!(usage.request_count, 1);
+    assert_eq!(usage.processed_tokens, 100);
+
+    let third = scan_local_transcripts_at(&root, utc("2026-09-09T12:00:00Z"));
+    assert_eq!(
+        third.observed_usage.unwrap().five_hour.request_count,
+        1,
+        "unchanged completed records must not be counted twice"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn transcript_subagent_usage_counts_but_subagent_cannot_be_current_session() {
     let root = transcript_test_root("subagent");
     let main = root.join("project").join("main.jsonl");

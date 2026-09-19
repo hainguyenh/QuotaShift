@@ -16,10 +16,8 @@
   --codex-accent-dim: rgba(255, 255, 255, 0.08);
   --codex-accent-border: rgba(255, 255, 255, 0.25);
 
-  --font-header:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-body:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-header: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Light Theme */
@@ -81,17 +79,20 @@
   background: transparent;
 }
 
-
 html,
 body,
 #app-root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: transparent;
   font-family: var(--font-body);
   color: var(--text-primary);
   user-select: none;
+}
+
+body.overlay-window,
+body.overlay-window #app-root {
+  background: transparent !important;
 }
 
 /* Solid Black Panel with Rounded Corners */
@@ -176,7 +177,9 @@ body,
   padding: 2px;
   border-radius: 2px;
   opacity: 0.6;
-  transition: opacity 0.15s, color 0.15s;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
 }
 
 .header-search-clear:hover {

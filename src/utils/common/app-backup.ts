@@ -1,6 +1,11 @@
 import { encrypt, decrypt, EncryptedBundle } from "../auth/crypto.js";
 import { AntigravityAccount, CodexAccount, CodexAccountPool } from "./types.js";
-import { loadCodexPools, saveAntigravityAccounts, saveCodexAccounts, saveCodexPools } from "./app-storage.js";
+import {
+  loadCodexPools,
+  saveAntigravityAccounts,
+  saveCodexAccounts,
+  saveCodexPools,
+} from "./app-storage.js";
 import { loadAccountOrder, saveAccountOrder, sortByOrder } from "../account/account-order.js";
 import { normalizeCodexPools, reconcileCodexPools } from "../codex/codex-pools.js";
 import { ANTIGRAVITY_ORDER_KEY, CODEX_ORDER_KEY } from "./app-constants.js";
@@ -52,22 +57,22 @@ export interface RestoreBackupResult {
 const isCodexCandidate = (item: any): boolean =>
   Boolean(
     item &&
-      typeof item === "object" &&
-      (item.apiKey ||
-        item.tokens ||
-        item.provider === "codex" ||
-        item.lastPlan ||
-        item.resetCredits ||
-        (item.id && typeof item.id === "string" && item.id.includes("oauth"))),
+    typeof item === "object" &&
+    (item.apiKey ||
+      item.tokens ||
+      item.provider === "codex" ||
+      item.lastPlan ||
+      item.resetCredits ||
+      (item.id && typeof item.id === "string" && item.id.includes("oauth"))),
   );
 
 const isAntigravityCandidate = (item: any): boolean =>
   Boolean(
     item &&
-      typeof item === "object" &&
-      (item.token ||
-        item.provider === "antigravity" ||
-        (item.id && typeof item.id === "string" && item.id.startsWith("ag-acct"))),
+    typeof item === "object" &&
+    (item.token ||
+      item.provider === "antigravity" ||
+      (item.id && typeof item.id === "string" && item.id.startsWith("ag-acct"))),
   );
 
 export const extractBackupPayload = (data: any) => {
@@ -79,7 +84,8 @@ export const extractBackupPayload = (data: any) => {
   if (Array.isArray(data)) {
     for (const item of data) {
       if (isAntigravityCandidate(item)) agAccounts.push(item);
-      else if (isCodexCandidate(item) || (item && typeof item === "object" && item.email)) cxAccounts.push(item);
+      else if (isCodexCandidate(item) || (item && typeof item === "object" && item.email))
+        cxAccounts.push(item);
     }
   } else {
     if (data.antigravity) {
@@ -102,20 +108,26 @@ export const extractBackupPayload = (data: any) => {
 
     if (data.platforms && typeof data.platforms === "object") {
       if (data.platforms.antigravity) {
-        if (Array.isArray(data.platforms.antigravity.accounts)) agAccounts = [...agAccounts, ...data.platforms.antigravity.accounts];
-        else if (Array.isArray(data.platforms.antigravity)) agAccounts = [...data.platforms.antigravity];
+        if (Array.isArray(data.platforms.antigravity.accounts))
+          agAccounts = [...agAccounts, ...data.platforms.antigravity.accounts];
+        else if (Array.isArray(data.platforms.antigravity))
+          agAccounts = [...data.platforms.antigravity];
       }
       if (data.platforms.codex) {
-        if (Array.isArray(data.platforms.codex.accounts)) cxAccounts = [...cxAccounts, ...data.platforms.codex.accounts];
-        else if (Array.isArray(data.platforms.codex)) cxAccounts = [...cxAccounts, ...data.platforms.codex];
-        if (Array.isArray(data.platforms.codex.pools)) pools = [...pools, ...data.platforms.codex.pools];
+        if (Array.isArray(data.platforms.codex.accounts))
+          cxAccounts = [...cxAccounts, ...data.platforms.codex.accounts];
+        else if (Array.isArray(data.platforms.codex))
+          cxAccounts = [...cxAccounts, ...data.platforms.codex];
+        if (Array.isArray(data.platforms.codex.pools))
+          pools = [...pools, ...data.platforms.codex.pools];
       }
     }
 
     if (Array.isArray(data.accounts)) {
       for (const item of data.accounts) {
         if (isAntigravityCandidate(item)) agAccounts.push(item);
-        else if (isCodexCandidate(item) || (item && typeof item === "object" && item.email)) cxAccounts.push(item);
+        else if (isCodexCandidate(item) || (item && typeof item === "object" && item.email))
+          cxAccounts.push(item);
       }
     }
 
@@ -127,7 +139,8 @@ export const extractBackupPayload = (data: any) => {
   return { agAccounts, cxAccounts, pools };
 };
 
-const normId = (val?: string | null): string => (typeof val === "string" ? val.trim().toLowerCase() : "");
+const normId = (val?: string | null): string =>
+  typeof val === "string" ? val.trim().toLowerCase() : "";
 
 export const restoreBackupData = (
   rawBackup: any,

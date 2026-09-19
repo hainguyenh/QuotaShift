@@ -1,4 +1,5 @@
 use crate::parser::parse_full_status;
+use crate::quota::refresh::build_refresh_attempts;
 use crate::types::FullStatus;
 use serde_json::Value;
 
@@ -55,49 +56,34 @@ pub(crate) async fn do_refresh_antigravity_token(
         .build()
         .map_err(|e| e.to_string())?;
 
-    let mut attempts: Vec<(&str, String, Option<String>)> = vec![(
-        "original",
+    let attempts = build_refresh_attempts(
+        auth_method,
         crate::secrets::AG_ORIGINAL_CLIENT_ID.to_string(),
-        None,
-    )];
-    if auth_method == Some("enterprise") {
-        attempts.push((
-            "enterprise",
-            crate::credential_store::enterprise_client_id(),
-            Some(crate::credential_store::enterprise_client_secret()),
-        ));
-        attempts.push((
-            "consumer",
-            crate::credential_store::consumer_client_id(),
-            Some(crate::credential_store::consumer_client_secret()),
-        ));
-    } else {
-        attempts.push((
-            "consumer",
-            crate::credential_store::consumer_client_id(),
-            Some(crate::credential_store::consumer_client_secret()),
-        ));
-        attempts.push((
-            "enterprise",
-            crate::credential_store::enterprise_client_id(),
-            Some(crate::credential_store::enterprise_client_secret()),
-        ));
+        crate::credential_store::consumer_client_id(),
+        crate::credential_store::consumer_client_secret(),
+        crate::credential_store::enterprise_client_id(),
+        crate::credential_store::enterprise_client_secret(),
+    );
+    if attempts.is_empty() {
+        return Err(
+            "No usable Antigravity OAuth client credentials were found. Re-authenticate this account."
+                .to_string(),
+        );
     }
 
     let mut last_error = String::new();
-    for (name, client_id, secret_opt) in &attempts {
+    for attempt in attempts {
         eprintln!(
-            "[quota] refresh attempt: name={}, client_id={}, has_secret={}",
-            name,
-            client_id,
-            secret_opt.is_some()
+            "[quota] refresh attempt: name={}, has_secret={}",
+            attempt.name,
+            attempt.client_secret.is_some()
         );
         let mut params = vec![
             ("grant_type", "refresh_token".to_string()),
             ("refresh_token", refresh_token.to_string()),
-            ("client_id", client_id.clone()),
+            ("client_id", attempt.client_id.clone()),
         ];
-        if let Some(secret) = secret_opt {
+        if let Some(secret) = attempt.client_secret.as_ref() {
             params.push(("client_secret", secret.clone()));
         }
 
@@ -115,18 +101,21 @@ pub(crate) async fn do_refresh_antigravity_token(
                     if let Ok(mut json) = serde_json::from_str::<Value>(&text) {
                         eprintln!(
                             "[quota] refresh OK via {}, got scope={:?}",
-                            name,
+                            attempt.name,
                             json.get("scope").and_then(|v| v.as_str())
                         );
-                        json["authMethod"] = serde_json::json!(name);
+                        json["authMethod"] = serde_json::json!(attempt.name);
                         return Ok(json);
                     }
                 }
-                eprintln!("[quota] refresh {} FAILED ({}): {}", name, status, text);
-                last_error = format!("{} refresh failed ({}): {}", name, status, text);
+                eprintln!(
+                    "[quota] refresh {} FAILED ({}): {}",
+                    attempt.name, status, text
+                );
+                last_error = format!("{} refresh failed ({}): {}", attempt.name, status, text);
             }
             Err(e) => {
-                last_error = format!("{} request error: {}", name, e);
+                last_error = format!("{} request error: {}", attempt.name, e);
             }
         }
     }

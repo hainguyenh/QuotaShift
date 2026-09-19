@@ -10,8 +10,8 @@ const styles = readWithCssImports('src/styles.css');
 
 test('Codex tab splits Accounts and Pools while keeping routing control global', () => {
   assert.match(tab, /useState<"accounts" \| "pools">\("accounts"\)/);
-  assert.match(tab, />Accounts</);
-  assert.match(tab, />Pools</);
+  assert.match(tab, />\s*Accounts\s*</);
+  assert.match(tab, />\s*Pools\s*</);
   assert.match(tab, /Pool Routing/);
   assert.match(tab, /role="switch"/);
   assert.match(tab, /aria-checked=\{poolRoutingEnabled\}/);

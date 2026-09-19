@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { obfuscate, deobfuscate, decodeJwtEmail, decodeJwtProfile } from "../../utils/auth/auth";
-import { CodexAccount } from "../../utils/common/types";
+import { resolveCodexLoginPicture } from "./codex-login-profile";
+import type { CodexAccount } from "../../utils/common/types";
 import { AccountModalLayout } from "../common/AccountModalLayout";
 import { CodexApiKeyTab } from "./CodexApiKeyTab";
 import { CodexBrowserLoginTab } from "./CodexBrowserLoginTab";
 import { CodexLocalSessionTab } from "./CodexLocalSessionTab";
-import { parseCodexLocalAuth } from "../../utils/codex/current-local-session";
+import { CodexModalHeaderIcon, CodexModalTabs } from "./CodexModalTabs";
+import { CodexModalFooter } from "./CodexModalFooter";
+import { createApiKeyCodexAccount, importLocalCodexSession } from "./codex-add-account-helpers";
+import { useCodexBrowserOAuth } from "./useCodexBrowserOAuth";
 
 interface AddAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAccountAdded: (accountId: string) => void;
+  onAccountsAdded: (accountIds: string[]) => void;
+  onAccountAdded?: (accountId: string) => void;
   showAlert: (msg: string) => Promise<void>;
   loadAccounts: () => CodexAccount[];
   saveAccounts: (accounts: CodexAccount[]) => void;
@@ -21,29 +25,58 @@ interface AddAccountModalProps {
 }
 
 export const AddAccountModal: React.FC<AddAccountModalProps> = ({
-  isOpen, onClose, onAccountAdded, showAlert, loadAccounts, saveAccounts, onStartFetching,
+  isOpen,
+  onClose,
+  onAccountsAdded,
+  showAlert,
+  loadAccounts,
+  saveAccounts,
+  onStartFetching,
 }) => {
   const [activeTab, setActiveTab] = useState<"apikey" | "browser" | "local">("browser");
   const [apiKeyLabel, setApiKeyLabel] = useState("");
   const [apiKeyVal, setApiKeyVal] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const [oauthStep, setOauthStep] = useState<1 | 2 | 3>(1);
-  const [oauthLoading, setOauthLoading] = useState(false);
-  const [oauthStatusText, setOauthStatusText] = useState("");
-  const [oauthStatusType, setOauthStatusType] = useState<"normal" | "error" | "success">("normal");
   const [localLabel, setLocalLabel] = useState("Codex CLI");
   const [localErrorText, setLocalErrorText] = useState<string | null>(null);
 
   const labelInputRef = useRef<HTMLInputElement>(null);
   const localLabelRef = useRef<HTMLInputElement>(null);
 
+  const {
+    oauthStep,
+    setOauthStep,
+    oauthLoading,
+    setOauthLoading,
+    oauthStatusText,
+    setOauthStatusText,
+    oauthStatusType,
+    setOauthStatusType,
+    resetOAuth,
+    handleStartBrowserLogin,
+    handleCopyLoginLink,
+    handleResetSession,
+  } = useCodexBrowserOAuth(showAlert);
+
   useEffect(() => {
     if (!isOpen) return;
-    setApiKeyLabel(""); setApiKeyVal(""); setShowApiKey(false);
-    setOauthStep(1); setOauthLoading(false);
-    setOauthStatusText(""); setOauthStatusType("normal");
-    setLocalLabel("Codex CLI"); setLocalErrorText(null); setActiveTab("browser");
+    setApiKeyLabel("");
+    setApiKeyVal("");
+    setShowApiKey(false);
+    resetOAuth();
+    setLocalLabel("Codex CLI");
+    setLocalErrorText(null);
+    setActiveTab("browser");
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,16 +86,17 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     const setupListener = async () => {
       const u = await listen<{ code?: string; error?: string }>("oauth-callback", async (event) => {
         const { code, error } = event.payload;
-        if (error) {
-          setOauthStatusType("error"); setOauthStatusText(`Login failed: ${error}`); setOauthLoading(false);
-          return;
-        }
-        if (!code) {
-          setOauthStatusType("error"); setOauthStatusText("No authorization code returned."); setOauthLoading(false);
+        if (error || !code) {
+          setOauthStatusType("error");
+          setOauthStatusText(error ? `Login failed: ${error}` : "No authorization code returned.");
+          setOauthLoading(false);
           return;
         }
 
-        setOauthStep(3); setOauthStatusType("normal"); setOauthStatusText("Exchanging code for tokens..."); setOauthLoading(true);
+        setOauthStep(3);
+        setOauthStatusType("normal");
+        setOauthStatusText("Exchanging code for tokens...");
+        setOauthLoading(true);
 
         try {
           const tokenJson = await invoke<any>("exchange_oauth_token", { code });
@@ -70,7 +104,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
           const refreshToken = tokenJson.refresh_token;
 
           if (!accessToken) {
-            setOauthStatusType("error"); setOauthStatusText("Failed to obtain access token."); setOauthLoading(false);
+            setOauthStatusType("error");
+            setOauthStatusText("Failed to obtain access token.");
+            setOauthLoading(false);
             return;
           }
 
@@ -79,7 +115,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
           const items = accountsResponse.items || [];
 
           if (items.length === 0) {
-            setOauthStatusType("error"); setOauthStatusText("No ChatGPT workspaces found on your account."); setOauthLoading(false);
+            setOauthStatusType("error");
+            setOauthStatusText("No ChatGPT workspaces found on your account.");
+            setOauthLoading(false);
             return;
           }
 
@@ -87,9 +125,14 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
           const profile = decodeJwtProfile(tokenJson.id_token);
           const email = profile?.email || decodeJwtEmail(tokenJson.id_token) || undefined;
           const profileName = profile?.name?.trim();
+          const profilePicture = await resolveCodexLoginPicture(
+            accessToken,
+            tokenJson.id_token,
+            accountsResponse,
+          );
           const emailLocalPart = email?.split("@")[0]?.trim();
           const baseLabel = profileName || emailLocalPart || "ChatGPT";
-          let lastAccountId: string | null = null;
+          const accountIds: string[] = [];
 
           items.forEach((item: any) => {
             const accountId = `acct-oauth-${item.id}`;
@@ -97,13 +140,19 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
             const workspaceName = item.name?.trim() || "Personal";
             const derivedLabel = items.length > 1 ? `${baseLabel} (${workspaceName})` : baseLabel;
             const accountLabel = existingAccount?.label?.trim() || derivedLabel;
-            const oauthData = { accessToken, refreshToken, accountId: item.id, idToken: tokenJson.id_token || null, isOAuth: true };
+            const oauthData = {
+              accessToken,
+              refreshToken,
+              accountId: item.id,
+              idToken: tokenJson.id_token || null,
+              isOAuth: true,
+            };
             const newAccount: CodexAccount = {
               id: accountId,
               label: accountLabel,
               apiKey: obfuscate(JSON.stringify(oauthData)),
               email,
-              profileUrl: profile?.picture ? obfuscate(profile.picture) : undefined,
+              profileUrl: profilePicture ? obfuscate(profilePicture) : existingAccount?.profileUrl,
             };
 
             const filtered = accounts.filter((a) => a.id !== newAccount.id);
@@ -111,23 +160,28 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
             accounts.length = 0;
             accounts.push(...filtered);
-            lastAccountId = newAccount.id;
+            accountIds.push(newAccount.id);
           });
 
           saveAccounts(accounts);
-          if (lastAccountId) onStartFetching(lastAccountId, true);
-          setOauthStatusType("success"); setOauthStatusText("✓ Connected successfully!"); setOauthLoading(false);
+          accountIds.forEach((id) => onStartFetching(id, true));
+          setOauthStatusType("success");
+          setOauthStatusText("✓ Connected successfully!");
+          setOauthLoading(false);
 
           setTimeout(() => {
             onClose();
-            if (lastAccountId) onAccountAdded(lastAccountId);
+            onAccountsAdded(accountIds);
           }, 1000);
         } catch (err: any) {
-          setOauthStatusType("error"); setOauthStatusText(err?.message ?? String(err)); setOauthLoading(false);
+          setOauthStatusType("error");
+          setOauthStatusText(err?.message ?? String(err));
+          setOauthLoading(false);
         }
       });
 
-      if (!active) u(); else unlistenFn = u;
+      if (!active) u();
+      else unlistenFn = u;
     };
 
     setupListener();
@@ -151,114 +205,46 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const handleConnectApiKey = async () => {
     const label = apiKeyLabel.trim();
     const apiKey = apiKeyVal.trim();
-    if (!label) { labelInputRef.current?.focus(); return; }
+    if (!label) {
+      labelInputRef.current?.focus();
+      return;
+    }
     if (!apiKey || !apiKey.startsWith("sk-")) {
-      await showAlert("API key must start with 'sk-'. Find your key at platform.openai.com/account/api-keys");
+      await showAlert(
+        "API key must start with 'sk-'. Find your key at platform.openai.com/account/api-keys",
+      );
       return;
     }
     const accounts = loadAccounts();
-    const newAccount: CodexAccount = { id: `acct-apikey-${Date.now()}`, label, apiKey: obfuscate(apiKey) };
+    const newAccount = createApiKeyCodexAccount(label, apiKey);
     accounts.push(newAccount);
     saveAccounts(accounts);
     onStartFetching(newAccount.id, false);
     onClose();
-    onAccountAdded(newAccount.id);
-  };
-
-  const handleStartBrowserLogin = async () => {
-    setOauthStatusType("normal"); setOauthStatusText("");
-    try {
-      setOauthLoading(true);
-      const authUrl = await invoke<string>("start_oauth_flow");
-      openUrl(authUrl);
-      setOauthStep(2); setOauthStatusText("Awaiting callback from browser...");
-    } catch (err: any) {
-      setOauthLoading(false); setOauthStatusType("error"); setOauthStatusText(err?.message ?? String(err));
-    }
-  };
-
-  const handleCopyLoginLink = async () => {
-    setOauthStatusType("normal"); setOauthStatusText("");
-    try {
-      setOauthLoading(true);
-      const authUrl = await invoke<string>("start_oauth_flow");
-      await navigator.clipboard.writeText(authUrl);
-      setOauthStep(2); setOauthStatusType("success");
-      setOauthStatusText("✓ Link copied! Paste and authenticate in your browser, then we'll automatically redirect back.");
-    } catch (err: any) {
-      setOauthLoading(false); setOauthStatusType("error"); setOauthStatusText(err?.message ?? String(err));
-    }
-  };
-
-  const handleResetSession = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    try {
-      await invoke("reset_oauth_session");
-      setOauthStep(1); setOauthLoading(false); setOauthStatusText(""); setOauthStatusType("normal");
-    } catch (err: any) {
-      await showAlert("Failed to reset session: " + err);
-    }
+    onAccountsAdded([newAccount.id]);
   };
 
   const handleLocalImport = async () => {
     const label = localLabel.trim();
-    if (!label) { localLabelRef.current?.focus(); return; }
+    if (!label) {
+      localLabelRef.current?.focus();
+      return;
+    }
     setLocalErrorText(null);
     try {
-      const rawAuth = await invoke<string | null>("read_codex_auth");
-      if (!rawAuth) {
-        setLocalErrorText("No Codex CLI session found at ~/.codex/auth.json. Log in via CLI first.");
+      const result = await importLocalCodexSession(label, loadAccounts, saveAccounts);
+      if (result.error) {
+        setLocalErrorText(result.error);
         return;
       }
-      const authData = JSON.parse(rawAuth);
-      if (!authData) { setLocalErrorText("Failed to parse auth.json. The file is empty or invalid."); return; }
-
-      const importedAccount: CodexAccount | null = parseCodexLocalAuth(authData, label);
-      if (!importedAccount) {
-        setLocalErrorText("auth.json does not contain valid ChatGPT tokens or OpenAI API Key.");
-        return;
-      }
-
-      if (importedAccount) {
-        const accounts = loadAccounts();
-        const existingIdx = accounts.findIndex((a) => a.id === importedAccount!.id || (importedAccount!.email && a.email === importedAccount!.email));
-        if (existingIdx !== -1) {
-          importedAccount.id = accounts[existingIdx].id;
-          accounts[existingIdx] = importedAccount;
-        } else {
-          accounts.push(importedAccount);
-        }
-        saveAccounts(accounts);
-        onStartFetching(importedAccount.id, deobfuscate(importedAccount.apiKey).startsWith("{"));
+      if (result.account) {
+        onStartFetching(result.account.id, deobfuscate(result.account.apiKey).startsWith("{"));
         onClose();
-        onAccountAdded(importedAccount.id);
+        onAccountsAdded([result.account.id]);
       }
     } catch (err: any) {
       setLocalErrorText(`Import failed: ${err?.message ?? String(err)}`);
     }
-  };
-
-  const renderFooterButtons = () => {
-    if (activeTab === "apikey") {
-      return (
-        <>
-          <button className="dialog-btn dialog-btn--cancel" onClick={onClose} data-tooltip="Cancel adding Codex account and close dialog">Cancel</button>
-          <button className="dialog-btn" onClick={handleConnectApiKey} data-tooltip="Validate key and connect the account">Connect</button>
-        </>
-      );
-    }
-    if (activeTab === "browser") {
-      return <button className="dialog-btn dialog-btn--cancel" onClick={onClose} data-tooltip="Cancel the browser login flow">Cancel</button>;
-    }
-    if (activeTab === "local") {
-      return (
-        <>
-          <button className="dialog-btn dialog-btn--cancel" onClick={onClose} data-tooltip="Cancel importing local session">Cancel</button>
-          <button className="dialog-btn" onClick={handleLocalImport} data-tooltip="Search and import active session from local files">Import Session</button>
-        </>
-      );
-    }
-    return null;
   };
 
   return (
@@ -266,24 +252,16 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Connect Codex Account"
-      icon={<svg viewBox="0 0 24 24" fill="none" width="14" height="14" style={{ color: "var(--codex-accent)" }}><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" /><path d="M9 9l6 3-6 3V9z" fill="currentColor" /></svg>}
-      tabs={
-        <div className="modal-tab-bar">
-          <button className={`modal-tab ${activeTab === "browser" ? "modal-tab--active" : ""}`} onClick={() => handleTabSwitch("browser")} data-tooltip="Log in via browser to connect Codex account">
-            <svg viewBox="0 0 24 24" fill="none" width="9" height="9"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" strokeWidth="1.8" /></svg>
-            Browser Login
-          </button>
-          <button className={`modal-tab ${activeTab === "apikey" ? "modal-tab--active" : ""}`} onClick={() => handleTabSwitch("apikey")} data-tooltip="Use an OpenAI API Key to connect Codex account">
-            <svg viewBox="0 0 24 24" fill="none" width="9" height="9"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            API Key
-          </button>
-          <button className={`modal-tab ${activeTab === "local" ? "modal-tab--active" : ""}`} onClick={() => handleTabSwitch("local")} data-tooltip="Import Codex CLI local auth file session">
-            <svg viewBox="0 0 24 24" fill="none" width="9" height="9"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" /><path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.8" /></svg>
-            Local Session
-          </button>
-        </div>
+      icon={<CodexModalHeaderIcon />}
+      tabs={<CodexModalTabs activeTab={activeTab} onTabSwitch={handleTabSwitch} />}
+      footerButtons={
+        <CodexModalFooter
+          activeTab={activeTab}
+          onClose={onClose}
+          onConnectApiKey={handleConnectApiKey}
+          onLocalImport={handleLocalImport}
+        />
       }
-      footerButtons={renderFooterButtons()}
     >
       {activeTab === "apikey" && (
         <CodexApiKeyTab

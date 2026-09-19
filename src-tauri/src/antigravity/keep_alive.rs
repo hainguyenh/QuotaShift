@@ -102,6 +102,7 @@ async fn maintain_one(
         account.access_token,
         account.refresh_token,
         account.auth_method,
+        None,
     )
     .await
     .map_err(|error| error.message)?;

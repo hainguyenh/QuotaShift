@@ -1,6 +1,6 @@
 [package]
 name = "quotashift"
-version = "1.0.6"
+version = "1.1.0"
 description = "QuotaShift - AI Quota & Account Swapper"
 authors = ["the-long-ride"]
 edition = "2021"
@@ -32,6 +32,7 @@ tauri-plugin-store = "2.4.3"
 toml_edit = "0.25"
 chrono = "0.4"
 sysinfo = "0.31"
+tauri-plugin-notification = "2"
 
 # -----------------------------------------------------------------------------
 # Security patch — RUSTSEC-2024-0429 / GHSA-wrw7-89jp-8q8g
@@ -60,3 +61,6 @@ tauri-plugin-global-shortcut = "2"
 
 [patch.crates-io]
 glib = { git = "https://github.com/andrew-wommack-ministries/glib-rustsec-2024-0429-backport", rev = "9e2bb20e2daba5b4dc5e2c9f4dee0797a1503b9f" }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

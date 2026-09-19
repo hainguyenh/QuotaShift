@@ -18,6 +18,7 @@ import {
   loadIdlePollIntervalPreference,
   saveIdlePollIntervalPreference,
 } from "../.test-build/poll-interval.js";
+import { readWithCssImports } from "./css-helper.mjs";
 
 function createMockStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -75,16 +76,18 @@ test("savePollIntervalPreference persists sanitized string to storage", () => {
 
 test("App contracts: poll interval is persisted across restarts", async () => {
   const fs = await import("node:fs");
-  const path = await import("node:path");
-  const appPath = path.resolve("src/App.tsx");
-  const appSrc = fs.readFileSync(appPath, "utf-8");
+  const appSrc = readWithCssImports("src/App.tsx");
 
   assert.match(appSrc, /loadPollIntervalPreference/);
   assert.match(appSrc, /savePollIntervalPreference/);
-  assert.match(appSrc, /const \[pollInterval, setPollInterval\] = useState\(\(\) => loadPollIntervalPreference\(\)\);/);
+  assert.match(
+    appSrc,
+    /const \[pollInterval, setPollInterval\] = useState\(\(\) => loadPollIntervalPreference\(\)\);/,
+  );
   assert.match(appSrc, /const initialPollInterval = loadPollIntervalPreference\(\);/);
-  assert.match(appSrc, /invoke\("set_poll_interval",\s*\{\s*seconds:\s*BigInt\(initialPollInterval\)\s*\}\)/);
+  assert.match(appSrc, /invoke\("set_poll_interval",\s*\{\s*seconds:\s*initialPollInterval\s*\}\)/);
   assert.match(appSrc, /savePollIntervalPreference\(sanitized\);/);
+  assert.doesNotMatch(appSrc, /seconds:\s*BigInt\(/);
 });
 
 test("Tracked and Idle poll rate defaults are 30s and 10min (600s)", () => {
@@ -121,5 +124,3 @@ test("Header contracts: tracked and idle poll rates are persisted to storage", a
   assert.match(headerSrc, /handleTrackedPollIntervalChange/);
   assert.match(headerSrc, /handleIdlePollIntervalChange/);
 });
-
-

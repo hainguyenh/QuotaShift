@@ -49,7 +49,9 @@ pub async fn query_server_https(
         Err(e) => return Err(e.to_string()),
     };
     if res.status().is_success() {
-        res.json::<Value>().await.map_err(|e| format!("APP_ERR: {}", e))
+        res.json::<Value>()
+            .await
+            .map_err(|e| format!("APP_ERR: {}", e))
     } else {
         Err(format!("APP_ERR: HTTP status: {}", res.status()))
     }

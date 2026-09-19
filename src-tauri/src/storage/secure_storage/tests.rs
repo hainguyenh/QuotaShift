@@ -135,4 +135,3 @@ fn process_lock_serializes_command_critical_sections() {
         .unwrap();
     worker.join().unwrap();
 }
-

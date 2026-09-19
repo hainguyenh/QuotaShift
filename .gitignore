@@ -44,3 +44,5 @@ desktop.ini
 # Local recovery exports - may contain real credentials
 recovered*.json
 exported*.json
+.superpowers/sdd/
+docs/superpowers/

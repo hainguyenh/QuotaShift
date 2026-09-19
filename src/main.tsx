@@ -17,12 +17,11 @@ import {
 import { initFrontendLogging, logFrontend, ErrorBoundary } from "./utils/common/logger";
 
 import { OverlayApp } from "./components/overlay/OverlayApp";
+import { OverlayWindowSizingBridge } from "./components/overlay/OverlayWindowSizingBridge";
 import { OverlayTooltipApp } from "./components/overlay/OverlayTooltipApp";
 
-// Initialize frontend logger immediately
 initFrontendLogging();
 
-// Prevent native webview context menu across all windows in production build
 if (!import.meta.env.DEV) {
   window.addEventListener(
     "contextmenu",
@@ -33,11 +32,9 @@ if (!import.meta.env.DEV) {
   );
 }
 
-// ── Constants ────────────────────────────────────────────────────────
 const PASSPHRASE_HASH_KEY = "_passphraseHash";
 const ENCRYPTED_MARKER_KEY = "_encrypted";
 
-// ── Migration Gate Component ────────────────────────────────────────
 function MigrationGate({
   store,
   existingHash,
@@ -48,16 +45,12 @@ function MigrationGate({
   onMigrated: (passphrase: string) => Promise<void>;
 }) {
   const [error, setError] = useState("");
-
   const handleSubmit = useCallback(
     async (passphrase: string) => {
       try {
         const hash = await hashPassphrase(passphrase);
-        if (hash === existingHash) {
-          await onMigrated(passphrase);
-        } else {
-          setError("Wrong passphrase. Please try again.");
-        }
+        if (hash === existingHash) await onMigrated(passphrase);
+        else setError("Wrong passphrase. Please try again.");
       } catch (err) {
         console.error("Migration error:", err instanceof Error ? err.message : "unknown error");
         setError("An error occurred during migration.");
@@ -65,11 +58,9 @@ function MigrationGate({
     },
     [store, existingHash, onMigrated],
   );
-
   return <PassphraseModal mode="migrate" onSubmit={handleSubmit} error={error} />;
 }
 
-// ── Bootstrap ────────────────────────────────────────────────────────
 async function decryptLegacyStoreValues(
   store: Store,
   passphrase: string,
@@ -79,7 +70,6 @@ async function decryptLegacyStoreValues(
   const dataKeys = keys.filter(
     (key) => key !== PASSPHRASE_HASH_KEY && key !== ENCRYPTED_MARKER_KEY,
   );
-
   for (const key of dataKeys) {
     const encrypted = await store.get<unknown>(key);
     if (encrypted === null || encrypted === undefined) continue;
@@ -91,19 +81,14 @@ async function decryptLegacyStoreValues(
         throw new Error(`Unable to decrypt legacy storage value for ${key}`);
       }
     }
-
-    if (isSensitiveStorageKey(key)) {
-      decryptedSensitiveValues[key] = decrypted;
-    } else {
-      await store.set(key, decrypted);
-    }
+    if (isSensitiveStorageKey(key)) decryptedSensitiveValues[key] = decrypted;
+    else await store.set(key, decrypted);
   }
   return decryptedSensitiveValues;
 }
 
 async function initStorageAndRender() {
   logFrontend("INFO", "main:bootstrap", "initStorageAndRender() starting");
-
   const appRoot = document.getElementById("app-root");
   if (!appRoot) {
     const msg = "CRITICAL: #app-root DOM element not found!";
@@ -111,11 +96,11 @@ async function initStorageAndRender() {
     console.error(msg);
     return;
   }
-
   const root: Root = createRoot(appRoot);
 
   const isOverlayTooltip = window.location.search.includes("window=overlay-tooltip");
   if (isOverlayTooltip) {
+    document.body.classList.add("overlay-window");
     logFrontend("INFO", "main:bootstrap", "Rendering OverlayTooltipApp");
     root.render(
       <StrictMode>
@@ -129,10 +114,12 @@ async function initStorageAndRender() {
 
   const isOverlay = window.location.search.includes("window=overlay");
   if (isOverlay) {
+    document.body.classList.add("overlay-window");
     logFrontend("INFO", "main:bootstrap", "Rendering OverlayApp");
     root.render(
       <StrictMode>
         <ErrorBoundary>
+          <OverlayWindowSizingBridge />
           <OverlayApp />
         </ErrorBoundary>
       </StrictMode>,
@@ -179,7 +166,6 @@ async function initStorageAndRender() {
     });
     await adapter.hydrate(decryptedSensitiveValues);
 
-    // Non-sensitive preferences continue to use the native storage facade.
     const keys = await store.keys();
     logFrontend("INFO", "main:bootstrap", `Read ${keys.length} keys from store`);
     const dataKeys = keys.filter(
@@ -198,12 +184,10 @@ async function initStorageAndRender() {
     }
 
     installSecureStorageFacade(adapter, window);
-
     await initializeAntigravityKeepAliveBridge().catch((error) => {
       console.warn("Failed to initialize Antigravity keep-alive", error);
     });
 
-    // Render the main app
     logFrontend("INFO", "main:bootstrap", "Rendering React application with ErrorBoundary...");
     root.render(
       <StrictMode>
@@ -216,7 +200,6 @@ async function initStorageAndRender() {
   };
 
   if (existingHash) {
-    // Show migration gate, then boot
     logFrontend("INFO", "main:bootstrap", "Displaying MigrationGate for legacy passphrase");
     root.render(
       <StrictMode>
@@ -226,7 +209,6 @@ async function initStorageAndRender() {
       </StrictMode>,
     );
   } else {
-    // No legacy passphrase, boot immediately
     await bootApp();
   }
 }
@@ -234,7 +216,5 @@ async function initStorageAndRender() {
 initStorageAndRender().catch((err) => {
   logFrontend("ERROR", "main:fatal", "Fatal error in initStorageAndRender()", err);
   const appRoot = document.getElementById("app-root");
-  if (appRoot) {
-    appRoot.textContent = `Fatal Startup Error\n\n${String(err)}`;
-  }
+  if (appRoot) appRoot.textContent = `Fatal Startup Error\n\n${String(err)}`;
 });

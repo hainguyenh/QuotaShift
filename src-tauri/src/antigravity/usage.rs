@@ -18,10 +18,6 @@ const SUMMARY_GEMINI_WEEKLY: &str = "gemini-weekly";
 const SUMMARY_THIRD_PARTY_FIVE_HOUR: &str = "3p-5h";
 const SUMMARY_THIRD_PARTY_WEEKLY: &str = "3p-weekly";
 
-/// Convert only the four documented Antigravity pool buckets into the existing
-/// grouped quota shape. Presence of a `groups` array means the summary endpoint
-/// answered authoritatively, even when none of its buckets are usable. Unknown
-/// future buckets are deliberately ignored instead of being guessed into a pool.
 fn sanitize_authoritative_quota_summary(value: &Value) -> Option<Value> {
     let groups = value
         .pointer("/response/groups")
@@ -86,9 +82,6 @@ async fn fetch_usage_with_token(
     let plan_tier = resolve_plan_tier(&load_response);
     let observed_at = Utc::now();
 
-    // Current Antigravity builds expose merged Gemini and third-party quota
-    // pools through retrieveUserQuotaSummary. It is the only remote source that
-    // can independently report both rolling five-hour and weekly windows.
     if let Some(raw_summary) = remote
         .retrieve_user_quota_summary(access_token, project_id.as_deref())
         .await?
@@ -124,9 +117,6 @@ async fn fetch_usage_with_token(
         }
     }
 
-    // Older builds/accounts may not expose the grouped summary. Fall back to
-    // the model catalog for current/five-hour quota only; never manufacture a
-    // weekly lane from its single quotaInfo value.
     let models_response = remote
         .fetch_available_models(access_token, project_id.as_deref())
         .await?;
@@ -205,8 +195,9 @@ pub(crate) async fn fetch_antigravity_account_usage(
     access_token: String,
     refresh_token: Option<String>,
     auth_method: Option<String>,
+    email: Option<String>,
 ) -> Result<AntigravityAccountUsage, AntigravityUsageCommandError> {
-    let remote = AntigravityRemoteClient::production()?;
+    let remote = AntigravityRemoteClient::production()?.with_diagnostic_email(email.as_deref());
     let token_input = AccessTokenInput {
         access_token,
         refresh_token,

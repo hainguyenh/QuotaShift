@@ -45,6 +45,20 @@
   gap: 4px;
 }
 
+/* Keep Codex identity content left-aligned while actions stay pinned right. */
+[data-card-mode="compact"] [id^="codex-account-"] .codex-card-header {
+  justify-content: flex-start;
+}
+
+[data-card-mode="compact"] [id^="codex-account-"] .codex-card-title-wrap {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+[data-card-mode="compact"] [id^="codex-account-"] .codex-card-header-actions {
+  margin-left: auto;
+}
+
 [data-card-mode="compact"] .codex-card-avatar {
   width: 18px;
   height: 18px;
@@ -384,3 +398,86 @@
   margin-left: 4px !important;
 }
 
+/* Claude Code compact cards keep Codex-like two-column quota bars visible. */
+[data-card-mode="compact"] .claude-account-card {
+  padding: 5px 8px !important;
+  gap: 3px !important;
+}
+
+[data-card-mode="compact"] .claude-card-header {
+  gap: 4px;
+}
+
+[data-card-mode="compact"] .claude-card-email {
+  font-size: 10px;
+}
+
+[data-card-mode="compact"] .claude-account-path {
+  display: none;
+}
+
+[data-card-mode="compact"] .claude-card-limits {
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+[data-card-mode="compact"] .claude-account-card .quota-limits-container {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+}
+
+[data-card-mode="compact"] .claude-account-card .quota-limit-col {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 3px !important;
+  padding: 2px 5px !important;
+  min-height: 19px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+[data-theme="light"] [data-card-mode="compact"] .claude-account-card .quota-limit-col {
+  border-color: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.025);
+}
+
+[data-card-mode="compact"] .claude-account-card .quota-limit-label-container {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  justify-content: flex-start !important;
+  gap: 3px !important;
+}
+
+[data-card-mode="compact"] .claude-account-card .quota-limit-reset {
+  font-size: 7.5px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+[data-card-mode="compact"] .claude-account-card .quota-limit-bar-container {
+  width: auto !important;
+  flex: 0 0 auto !important;
+  gap: 4px !important;
+  margin-left: 2px !important;
+}
+
+[data-card-mode="compact"] .claude-account-card .progress-container {
+  display: block !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 3px !important;
+}
+
+[data-card-mode="compact"] .claude-account-card .progress-bar {
+  display: block !important;
+}
+
+[data-card-mode="compact"] .claude-account-card .quota-value {
+  width: auto !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+}

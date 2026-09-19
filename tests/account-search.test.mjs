@@ -115,6 +115,6 @@ test("CSS contracts: header search input allows user text selection and track bu
   assert.match(agCss, /\.account-action-btn--icon-only\s*svg\s*\{[^}]*margin:\s*0\s*auto;/);
 
   // Buttons have no whitespace text nodes around TrackCurrentAccountIcon
-  assert.match(agTabSrc, /<button[^>]*account-action-btn--icon-only[^>]*><TrackCurrentAccountIcon \/><\/button>/);
-  assert.match(codexTabSrc, /<button[^>]*account-action-btn--icon-only[^>]*><TrackCurrentAccountIcon \/><\/button>/);
+  assert.match(agTabSrc, /<button[^>]*account-action-btn--icon-only[^>]*>\s*<TrackCurrentAccountIcon\s*\/>\s*<\/button>/);
+  assert.match(codexTabSrc, /<button[^>]*account-action-btn--icon-only[^>]*>\s*<TrackCurrentAccountIcon\s*\/>\s*<\/button>/);
 });

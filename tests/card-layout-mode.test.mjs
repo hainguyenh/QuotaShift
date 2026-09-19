@@ -30,7 +30,9 @@ test("saveCardLayoutModePreference writes to storage", () => {
   const store = {};
   const mockStorage = {
     getItem: (k) => store[k] ?? null,
-    setItem: (k, v) => { store[k] = String(v); },
+    setItem: (k, v) => {
+      store[k] = String(v);
+    },
   };
   saveCardLayoutModePreference("compact", mockStorage);
   assert.equal(store[CARD_LAYOUT_MODE_KEY], "compact");
@@ -39,12 +41,13 @@ test("saveCardLayoutModePreference writes to storage", () => {
 });
 
 test("SettingsModal defines segmented switch with Compact and Expand buttons", () => {
-  const modalCode = fs.readFileSync(path.resolve("src/components/common/SettingsModal.tsx"), "utf8");
+  const modalCode =
+    fs.readFileSync(path.resolve("src/components/common/SettingsModal.tsx"), "utf8") +
+    fs.readFileSync(path.resolve("src/components/common/CardViewSetting.tsx"), "utf8");
   assert.match(modalCode, /settings-segmented-switch/);
   assert.match(modalCode, />\s*Compact\s*<\/button>/);
   assert.match(modalCode, />\s*Expand\s*<\/button>/);
 });
-
 test("compact-mode.css hides progress bars in compact mode", () => {
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
   assert.match(css, /\[data-card-mode="compact"\]\s+\.progress-container/);
@@ -52,25 +55,41 @@ test("compact-mode.css hides progress bars in compact mode", () => {
 });
 
 test("AntigravityQuotaRows attaches antigravity-quota-group and antigravity-quota-list classes", () => {
-  const code = fs.readFileSync(path.resolve("src/components/antigravity/AntigravityQuotaRows.tsx"), "utf8");
+  const code = fs.readFileSync(
+    path.resolve("src/components/antigravity/AntigravityQuotaRows.tsx"),
+    "utf8",
+  );
   assert.match(code, /antigravity-quota-group/);
   assert.match(code, /antigravity-quota-list/);
 });
 
 test("compact-mode.css forces 1-line row layout for antigravity-quota-group", () => {
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.antigravity-quota-group\s*\{[^}]*flex-direction:\s*row\s*!important/s);
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.antigravity-quota-group\s*\{[^}]*flex-direction:\s*row\s*!important/s,
+  );
 });
 
 test("CodexTab wraps account info and limits in codex-card-row", () => {
-  const code = fs.readFileSync(path.resolve("src/components/codex/CodexTab.tsx"), "utf8");
+  const code =
+    fs.readFileSync(path.resolve("src/components/codex/CodexTab.tsx"), "utf8") +
+    (fs.existsSync(path.resolve("src/components/codex/CodexAccountCard.tsx"))
+      ? fs.readFileSync(path.resolve("src/components/codex/CodexAccountCard.tsx"), "utf8")
+      : "");
   assert.match(code, /className="codex-card-row"/);
 });
 
 test("compact-mode.css places codex-card-row on the same row", () => {
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.codex-card-row\s*\{[^}]*flex-direction:\s*row\s*!important/s);
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.codex-card-row\s+\.codex-card-limits\s*\{[^}]*border-top:\s*none\s*!important/s);
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.codex-card-row\s*\{[^}]*flex-direction:\s*row\s*!important/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.codex-card-row\s+\.codex-card-limits\s*\{[^}]*border-top:\s*none\s*!important/s,
+  );
 });
 
 test("formatCompactLimitLabel maps limit windows to 5HR, WK, MO, DAY, YR", () => {
@@ -100,11 +119,18 @@ test("formatCompactTierName maps plans to PRO, ULTRA, PLUS, FREE", () => {
 test("compact-mode.css toggles label-full vs label-compact and plan-full vs plan-compact", () => {
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
   assert.match(css, /\.label-compact,\s*\.plan-compact\s*\{[^}]*display:\s*none\s*!important/s);
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.label-compact,\s*\[data-card-mode="compact"\]\s+\.plan-compact\s*\{[^}]*display:\s*inline\s*!important/s);
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.label-compact,\s*\[data-card-mode="compact"\]\s+\.plan-compact\s*\{[^}]*display:\s*inline\s*!important/s,
+  );
 });
 
 test("CodexTab places email and tier badge to the right of alias in order: aliasname - email - tier badge", () => {
-  const code = fs.readFileSync(path.resolve("src/components/codex/CodexTab.tsx"), "utf8");
+  const code =
+    fs.readFileSync(path.resolve("src/components/codex/CodexTab.tsx"), "utf8") +
+    (fs.existsSync(path.resolve("src/components/codex/CodexAccountCard.tsx"))
+      ? fs.readFileSync(path.resolve("src/components/codex/CodexAccountCard.tsx"), "utf8")
+      : "");
   const aliasIdx = code.indexOf("codex-label-text");
   const emailIdx = code.indexOf("codex-card-header-email");
   const badgeIdx = code.indexOf("codex-card-tier-badge");
@@ -115,16 +141,31 @@ test("CodexTab places email and tier badge to the right of alias in order: alias
 
 test("compact-mode.css shows header email and tier badge only in compact mode", () => {
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
-  assert.match(css, /\.codex-card-header-email,\s*\.codex-card-tier-badge\s*\{[^}]*display:\s*none\s*!important/s);
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.codex-card-header-email\s*\{[^}]*display:\s*inline-block\s*!important/s);
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.codex-card-tier-badge\s*\{[^}]*display:\s*inline-flex\s*!important/s);
+  assert.match(
+    css,
+    /\.codex-card-header-email,\s*\.codex-card-tier-badge\s*\{[^}]*display:\s*none\s*!important/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.codex-card-header-email\s*\{[^}]*display:\s*inline-block\s*!important/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.codex-card-tier-badge\s*\{[^}]*display:\s*inline-flex\s*!important/s,
+  );
 });
 
 test("AntigravityQuotaRows uses ModelPoolIcon in compact mode and text in expanded mode", () => {
-  const code = fs.readFileSync(path.resolve("src/components/antigravity/AntigravityQuotaRows.tsx"), "utf8");
+  const code = fs.readFileSync(
+    path.resolve("src/components/antigravity/AntigravityQuotaRows.tsx"),
+    "utf8",
+  );
   assert.match(code, /import\s+\{\s*ModelPoolIcon\s*\}\s+from\s+["']\.\.\/common\/ModelLogos["']/);
   assert.match(code, /className="label-full">\s*\{quota\.model\}\s*<\/span>/);
-  assert.match(code, /className="label-compact model-icon-compact">\s*<ModelPoolIcon\s+model=\{quota\.model\}\s*\/>/);
+  assert.match(
+    code,
+    /className="label-compact model-icon-compact">\s*<ModelPoolIcon\s+model=\{quota\.model\}\s*\/>/,
+  );
 });
 
 test("ModelLogos exports GeminiLogo, OpenAILogo, ClaudeOpenAIDualLogo, and ModelPoolIcon", () => {
@@ -140,18 +181,33 @@ test("ModelLogos exports GeminiLogo, OpenAILogo, ClaudeOpenAIDualLogo, and Model
 
 test("compact-mode.css sizes quota-item-header to 42px and styles model-dual-logo", () => {
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.antigravity-quota-group\s+\.quota-item-header\s*\{[^}]*flex:\s*0 0 42px\s*!important/s);
-  assert.match(css, /\[data-card-mode="compact"\]\s+\.model-icon-compact\s*\{[^}]*display:\s*inline-flex\s*!important/s);
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.antigravity-quota-group\s+\.quota-item-header\s*\{[^}]*flex:\s*0 0 42px\s*!important/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.model-icon-compact\s*\{[^}]*display:\s*inline-flex\s*!important/s,
+  );
   assert.match(css, /\.model-dual-logo\s*\{[^}]*display:\s*inline-flex/s);
 });
 
 test("Antigravity account email displays fully without 95px truncation", () => {
   const compactCss = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
   const agyCss = fs.readFileSync(path.resolve("src/styles/antigravity.css"), "utf8");
-  const agyTab = fs.readFileSync(path.resolve("src/components/antigravity/AntigravityTab.tsx"), "utf8");
+  const agyTab = fs.readFileSync(
+    path.resolve("src/components/antigravity/AntigravityTab.tsx"),
+    "utf8",
+  );
 
-  assert.match(compactCss, /\.tab-panel--antigravity\s+\.codex-card-email-info\s*\{[^}]*max-width:\s*none\s*!important/s);
-  assert.match(agyCss, /\.tab-panel--antigravity\s+\.codex-card-email-info\s*\{[^}]*max-width:\s*none\s*!important/s);
+  assert.match(
+    compactCss,
+    /\.tab-panel--antigravity\s+\.codex-card-email-info\s*\{[^}]*max-width:\s*none\s*!important/s,
+  );
+  assert.match(
+    agyCss,
+    /\.tab-panel--antigravity\s+\.codex-card-email-info\s*\{[^}]*max-width:\s*none\s*!important/s,
+  );
   assert.match(agyTab, /className="tab-panel tab-panel--active tab-panel--antigravity"/);
 });
 
@@ -159,13 +215,22 @@ test("compact-mode.css anchors Codex header email and tier badge to the right", 
   const css = fs.readFileSync(path.resolve("src/styles/compact-mode.css"), "utf8");
   assert.match(
     css,
-    /\[data-card-mode="compact"\]\s+\.codex-card-header-email\s*\{[^}]*margin-left:\s*auto\s*!important/s
+    /\[data-card-mode="compact"\]\s+\[id\^="codex-account-"\]\s+\.codex-card-header\s*\{[^}]*justify-content:\s*flex-start/s,
   );
   assert.match(
     css,
-    /\[data-card-mode="compact"\]\s+\.codex-label-text\s*\+\s*\.codex-card-tier-badge[^{]*\{[^}]*margin-left:\s*auto\s*!important/s
+    /\[data-card-mode="compact"\]\s+\[id\^="codex-account-"\]\s+\.codex-card-title-wrap\s*\{[^}]*flex:\s*1 1 auto\s*!important/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\[id\^="codex-account-"\]\s+\.codex-card-header-actions\s*\{[^}]*margin-left:\s*auto/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.codex-card-header-email\s*\{[^}]*margin-left:\s*auto\s*!important/s,
+  );
+  assert.match(
+    css,
+    /\[data-card-mode="compact"\]\s+\.codex-label-text\s*\+\s*\.codex-card-tier-badge[^{]*\{[^}]*margin-left:\s*auto\s*!important/s,
   );
 });
-
-
-

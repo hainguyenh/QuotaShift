@@ -2,6 +2,8 @@ export interface SortableCardRect {
   id: string;
   top: number;
   bottom: number;
+  left?: number;
+  right?: number;
 }
 
 export interface PointerReorderUpdate {
@@ -21,6 +23,8 @@ export function reorderIdsAtPointer(
   rects: SortableCardRect[],
   pointerY: number,
   grabOffsetY?: number,
+  pointerX?: number,
+  grabOffsetX?: number,
 ): string[] {
   if (!ids.includes(sourceId) || ids.length < 2) return [...ids];
 
@@ -33,21 +37,47 @@ export function reorderIdsAtPointer(
       : pointerY;
 
   const remaining = ids.filter((id) => id !== sourceId);
-  const sortedAll = rects
-    .filter((r) => ids.includes(r.id))
-    .sort((a, b) => a.top - b.top);
+  const rectById = new Map(rects.map((rect) => [rect.id, rect]));
+  const orderedRects = ids.map((id) => rectById.get(id)).filter(Boolean) as SortableCardRect[];
 
   let targetIndex = remaining.length;
+  const hasFlowGeometry =
+    pointerX !== undefined &&
+    sourceRect?.left !== undefined &&
+    sourceRect.right !== undefined &&
+    orderedRects.length >= 2 &&
+    orderedRects.every((rect) => rect.left !== undefined && rect.right !== undefined);
 
-  if (sortedAll.length >= 2 && sourceRect) {
+  if (hasFlowGeometry && sourceRect) {
+    const sourceWidth = Math.max(1, sourceRect.right! - sourceRect.left!);
+    const draggedCenterX =
+      grabOffsetX !== undefined ? pointerX! - grabOffsetX + sourceWidth / 2 : pointerX!;
+
+    let bestSlot = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    orderedRects.forEach((rect, index) => {
+      const width = Math.max(1, rect.right! - rect.left!);
+      const height = Math.max(1, rect.bottom - rect.top);
+      const centerX = (rect.left! + rect.right!) / 2;
+      const centerY = (rect.top + rect.bottom) / 2;
+      const dx = (draggedCenterX - centerX) / width;
+      const dy = (draggedCenter - centerY) / height;
+      const distance = dx * dx + dy * dy;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestSlot = index;
+      }
+    });
+    targetIndex = bestSlot;
+  } else if (orderedRects.length >= 2 && sourceRect) {
     const boundaries: number[] = [];
-    for (let i = 0; i < sortedAll.length - 1; i++) {
-      const cA = (sortedAll[i].top + sortedAll[i].bottom) / 2;
-      const cB = (sortedAll[i + 1].top + sortedAll[i + 1].bottom) / 2;
+    for (let i = 0; i < orderedRects.length - 1; i++) {
+      const cA = (orderedRects[i].top + orderedRects[i].bottom) / 2;
+      const cB = (orderedRects[i + 1].top + orderedRects[i + 1].bottom) / 2;
       boundaries.push((cA + cB) / 2);
     }
 
-    let slot = sortedAll.length - 1;
+    let slot = orderedRects.length - 1;
     for (let i = 0; i < boundaries.length; i++) {
       if (draggedCenter < boundaries[i]) {
         slot = i;
@@ -83,6 +113,7 @@ export class PointerReorderController {
   private startX = 0;
   private startY = 0;
   private grabOffsetY: number | undefined = undefined;
+  private grabOffsetX: number | undefined = undefined;
   private dragging = false;
   private originalIds: string[] = [];
   private previewIds: string[] = [];
@@ -102,6 +133,7 @@ export class PointerReorderController {
     ids: string[],
     rects?: SortableCardRect[],
     grabOffsetY?: number,
+    grabOffsetX?: number,
   ): void {
     this.sourceId = sourceId;
     this.pointerId = pointerId;
@@ -112,14 +144,15 @@ export class PointerReorderController {
     this.previewIds = [...ids];
     this.cancelled = false;
     this.initialRects = rects ? [...rects] : [];
-    if (grabOffsetY !== undefined) {
-      this.grabOffsetY = grabOffsetY;
-    } else if (rects) {
-      const src = rects.find((r) => r.id === sourceId);
-      this.grabOffsetY = src ? y - src.top : undefined;
-    } else {
-      this.grabOffsetY = undefined;
-    }
+    const sourceRect = rects?.find((r) => r.id === sourceId);
+    this.grabOffsetY =
+      grabOffsetY !== undefined ? grabOffsetY : sourceRect ? y - sourceRect.top : undefined;
+    this.grabOffsetX =
+      grabOffsetX !== undefined
+        ? grabOffsetX
+        : sourceRect?.left !== undefined
+          ? x - sourceRect.left
+          : undefined;
   }
 
   ownsPointer(pointerId: number): boolean {
@@ -141,19 +174,24 @@ export class PointerReorderController {
 
     if (this.initialRects.length === 0 && rects && rects.length > 0) {
       this.initialRects = [...rects];
+      const src = rects.find((r) => r.id === this.sourceId);
       if (this.grabOffsetY === undefined) {
-        const src = rects.find((r) => r.id === this.sourceId);
         this.grabOffsetY = src ? this.startY - src.top : undefined;
+      }
+      if (this.grabOffsetX === undefined && src?.left !== undefined) {
+        this.grabOffsetX = this.startX - src.left;
       }
     }
 
-    const activeRects = this.initialRects.length > 0 ? this.initialRects : (rects || []);
+    const activeRects = this.initialRects.length > 0 ? this.initialRects : rects || [];
     this.previewIds = reorderIdsAtPointer(
       this.originalIds,
       this.sourceId,
       activeRects,
       y,
       this.grabOffsetY,
+      x,
+      this.grabOffsetX,
     );
     return { dragging: true, ids: [...this.previewIds], sourceId: this.sourceId };
   }
@@ -190,5 +228,6 @@ export class PointerReorderController {
     this.previewIds = [];
     this.initialRects = [];
     this.grabOffsetY = undefined;
+    this.grabOffsetX = undefined;
   }
 }

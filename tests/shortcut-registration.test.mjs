@@ -15,6 +15,9 @@ function createFakePort() {
       handlers.get(shortcut)?.();
     },
     port: {
+      async isRegistered(shortcut) {
+        return active.has(shortcut);
+      },
       async register(shortcut, onPressed) {
         operations.push(`register:${shortcut}`);
         if (active.has(shortcut)) throw new Error(`already registered: ${shortcut}`);
@@ -32,6 +35,30 @@ function createFakePort() {
     },
   };
 }
+
+test("reclaims shortcuts left registered by a previous WebView", async () => {
+  const fake = createFakePort();
+  const shortcut = "CommandOrControl+Alt+D";
+  fake.active.add(shortcut);
+  const controller = createShortcutRegistrationController(fake.port, {
+    onToggleOverlay() {},
+    onRefreshAccount() {},
+  });
+
+  await controller.replace({ toggleOverlay: shortcut, refreshAccount: "" });
+
+  assert.equal(fake.active.has(shortcut), true);
+  const unregisterIndex = fake.operations.indexOf(`unregister:${shortcut}`);
+  const registerIndex = fake.operations.indexOf(`register:${shortcut}`);
+  assert.ok(unregisterIndex > -1, "stale application registration must be removed");
+  assert.ok(
+    registerIndex > unregisterIndex,
+    "shortcut must be registered again after stale cleanup",
+  );
+
+  await controller.dispose();
+  assert.equal(fake.active.size, 0);
+});
 
 test("rebinding replaces old global shortcuts immediately", async () => {
   const fake = createFakePort();

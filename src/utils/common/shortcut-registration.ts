@@ -1,6 +1,7 @@
 import type { ShortcutPreferences } from "./shortcuts";
 
 export interface ShortcutRegistrationPort {
+  isRegistered?(shortcut: string): Promise<boolean>;
   register(shortcut: string, onPressed: () => void): Promise<void>;
   unregister(shortcuts: string | string[]): Promise<void>;
 }
@@ -49,6 +50,17 @@ export function createShortcutRegistrationController(
       if (registeredKeys.has(shortcut)) continue;
 
       try {
+        if (port.isRegistered) {
+          try {
+            if (await port.isRegistered(shortcut)) {
+              await port.unregister(shortcut);
+            }
+          } catch (error) {
+            console.warn("Failed to inspect stale shortcut registration:", shortcut, error);
+          }
+        }
+        if (disposed || requestedRevision !== revision) return;
+
         await port.register(shortcut, () => {
           if (disposed) return;
           activeBindings.get(shortcut)?.();

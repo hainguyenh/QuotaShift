@@ -1,4 +1,4 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
@@ -11,12 +11,14 @@ test("Claude preference normalization clamps values before UI state and persiste
     normalizeClaudePreferences({
       pollIntervalSecs: 60,
       enabled: true,
+      autoResumeAtReset: false,
       fiveHour: { enabled: true, thresholdPct: 150 },
       weekly: { enabled: true, thresholdPct: 0 },
     }),
     {
       pollIntervalSecs: 60,
       enabled: true,
+      autoResumeAtReset: false,
       fiveHour: { enabled: true, thresholdPct: 100 },
       weekly: { enabled: true, thresholdPct: 1 },
     },

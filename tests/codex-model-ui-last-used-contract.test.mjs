@@ -9,7 +9,11 @@ const app = read("src/App.tsx");
 const available = read("src/components/codex/CodexAvailableModelsDialog.tsx");
 const pool = read("src/components/codex/CodexPoolModal.tsx");
 const layout = read("src/components/common/AccountModalLayout.tsx");
-const codexTab = read("src/components/codex/CodexTab.tsx");
+const codexTab =
+  read("src/components/codex/CodexTab.tsx") +
+  (fs.existsSync("src/components/codex/CodexAccountCard.tsx")
+    ? read("src/components/codex/CodexAccountCard.tsx")
+    : "");
 const antigravityTab = read("src/components/antigravity/AntigravityTab.tsx");
 const addCodex = read("src/components/codex/AddAccountModal.tsx");
 const addAntigravity = read("src/components/antigravity/AddAntigravityAccountModal.tsx");
@@ -52,7 +56,7 @@ test("saved Codex and Antigravity accounts persist last-used timestamps", () => 
 
 test("browser account collection does not count as use and reconnect preserves last-used history", () => {
   const antigravityModalPropsStart = app.indexOf("<AddAntigravityAccountModal");
-  const antigravityModalPropsEnd = app.indexOf("{/* Export / Import Passphrase Modal */}", antigravityModalPropsStart);
+  const antigravityModalPropsEnd = app.indexOf("<PassphraseModal", antigravityModalPropsStart);
   assert.ok(antigravityModalPropsStart >= 0 && antigravityModalPropsEnd > antigravityModalPropsStart);
   const antigravityModalProps = app.slice(antigravityModalPropsStart, antigravityModalPropsEnd);
   assert.doesNotMatch(

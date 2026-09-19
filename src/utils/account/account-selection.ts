@@ -1,4 +1,9 @@
-import { CodexAccount, AntigravityAccount, QuotaData, AntigravityModelQuota } from "../common/types";
+import {
+  CodexAccount,
+  AntigravityAccount,
+  QuotaData,
+  AntigravityModelQuota,
+} from "../common/types";
 
 export const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 

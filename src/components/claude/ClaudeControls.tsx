@@ -38,19 +38,20 @@ const GuardrailSwitch: React.FC<{
 export function getCollapsedGuardrailDescription(preferences: ClaudePreferences): string {
   const fiveOn = preferences.fiveHour.enabled;
   const weeklyOn = preferences.weekly.enabled;
+  const autoResume = `Auto-resume: ${preferences.autoResumeAtReset ? "on" : "off"}`;
 
   if (!fiveOn && !weeklyOn) {
-    return "";
+    return ` - ${autoResume}`;
   }
 
   const poll = `${preferences.pollIntervalSecs}s`;
   if (fiveOn && weeklyOn) {
-    return ` - Poll rate: ${poll} - Stop Claude when hit ${preferences.fiveHour.thresholdPct}% of 5 hrs limit or ${preferences.weekly.thresholdPct}% of weekly limit.`;
+    return ` - ${autoResume} - Poll rate: ${poll} - Suspend each Claude Code account when usage reaches ${preferences.fiveHour.thresholdPct}% of 5 hrs or ${preferences.weekly.thresholdPct}% of weekly.`;
   }
   if (fiveOn) {
-    return ` - Poll rate: ${poll} - Stop Claude when hit ${preferences.fiveHour.thresholdPct}% of 5 hrs limit.`;
+    return ` - ${autoResume} - Poll rate: ${poll} - Suspend each Claude Code account when usage reaches ${preferences.fiveHour.thresholdPct}% of 5 hrs.`;
   }
-  return ` - Poll rate: ${poll} - Stop Claude when hit ${preferences.weekly.thresholdPct}% of weekly limit.`;
+  return ` - ${autoResume} - Poll rate: ${poll} - Suspend each Claude Code account when usage reaches ${preferences.weekly.thresholdPct}% of weekly.`;
 }
 
 export const ClaudeControls: React.FC<ClaudeControlsProps> = ({
@@ -134,9 +135,9 @@ export const ClaudeControls: React.FC<ClaudeControlsProps> = ({
           onClick={() => setDetailsExpanded((expanded) => !expanded)}
         >
           <span className="claude-controls-summary-copy">
-            <strong>Claude guardrails</strong>
+            <strong>Claude Code guardrails</strong>
             <span>
-              {armed ? "Auto-stop armed" : "Auto-stop disabled"}
+              {armed ? "Auto-suspend armed" : "Auto-suspend disabled"}
               {!detailsExpanded && getCollapsedGuardrailDescription(preferences)}
             </span>
           </span>
@@ -166,34 +167,69 @@ export const ClaudeControls: React.FC<ClaudeControlsProps> = ({
 
       {detailsExpanded && (
         <div className="claude-controls-details" id="claude-guardrail-details">
-          <label className="claude-control-field claude-poll-control">
-            <span className="claude-control-label-row">
-              <span className="claude-control-label">Poll rate (sec)</span>
-              <span className="claude-control-note">Recommended 15–30s</span>
-            </span>
-            <input
-              type="number"
-              className="claude-control-input"
-              min={MIN_CLAUDE_POLL_INTERVAL_SECS}
-              max={MAX_CLAUDE_POLL_INTERVAL_SECS}
-              step={1}
-              value={pollDraft}
-              onChange={(event) => setPollDraft(event.target.value)}
-              onBlur={commitPoll}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-              }}
-              aria-label="Claude guardrail poll interval in seconds"
-            />
-          </label>
+          <div className="claude-guardrail-primary-row">
+            <div className="claude-auto-resume-group">
+              <span className="claude-auto-resume-copy">
+                <strong
+                  className={`claude-control-label ${preferences.autoResumeAtReset ? "claude-control-label--active" : ""}`}
+                >
+                  Auto-resume at quota reset
+                </strong>
+                <small>
+                  Resume only the same suspended process after all triggered limits reset.
+                </small>
+              </span>
+              <GuardrailSwitch
+                checked={preferences.autoResumeAtReset}
+                label="Auto-resume Claude Code at quota reset"
+                onChange={(autoResumeAtReset) =>
+                  applyPreferences({ ...preferences, autoResumeAtReset })
+                }
+              />
+            </div>
+
+            <div className="claude-control-field claude-poll-control claude-poll-control--inline">
+              <span className="claude-poll-copy">
+                <label
+                  className={`claude-control-label ${armed ? "claude-control-label--active" : ""}`}
+                  htmlFor="claude-poll-rate"
+                >
+                  Poll rate
+                </label>
+                <span className="claude-control-note">Recommended 15–30s</span>
+              </span>
+              <span className="claude-poll-input-wrap">
+                <input
+                  id="claude-poll-rate"
+                  type="number"
+                  className="claude-control-input"
+                  min={MIN_CLAUDE_POLL_INTERVAL_SECS}
+                  max={MAX_CLAUDE_POLL_INTERVAL_SECS}
+                  step={1}
+                  value={pollDraft}
+                  onChange={(event) => setPollDraft(event.target.value)}
+                  onBlur={commitPoll}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") event.currentTarget.blur();
+                  }}
+                  aria-label="Claude Code guardrail poll interval in seconds"
+                />
+                <span className="claude-control-unit">s</span>
+              </span>
+            </div>
+          </div>
 
           <div className="claude-threshold-grid">
             <div className="claude-threshold-control">
               <div className="claude-threshold-heading">
-                <span>5-hour stop %</span>
+                <span
+                  className={preferences.fiveHour.enabled ? "claude-control-label--active" : ""}
+                >
+                  5-hour suspend %
+                </span>
                 <GuardrailSwitch
                   checked={preferences.fiveHour.enabled}
-                  label="Enable 5-hour Claude stop threshold"
+                  label="Enable 5-hour Claude Code suspend threshold"
                   onChange={(enabled) => toggleWindow("fiveHour", enabled)}
                 />
               </div>
@@ -209,16 +245,18 @@ export const ClaudeControls: React.FC<ClaudeControlsProps> = ({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") event.currentTarget.blur();
                 }}
-                aria-label="Claude 5-hour auto-stop threshold percent"
+                aria-label="Claude Code 5-hour auto-suspend threshold percent"
               />
             </div>
 
             <div className="claude-threshold-control">
               <div className="claude-threshold-heading">
-                <span>Weekly stop %</span>
+                <span className={preferences.weekly.enabled ? "claude-control-label--active" : ""}>
+                  Weekly suspend %
+                </span>
                 <GuardrailSwitch
                   checked={preferences.weekly.enabled}
-                  label="Enable weekly Claude stop threshold"
+                  label="Enable weekly Claude Code suspend threshold"
                   onChange={(enabled) => toggleWindow("weekly", enabled)}
                 />
               </div>
@@ -234,14 +272,18 @@ export const ClaudeControls: React.FC<ClaudeControlsProps> = ({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") event.currentTarget.blur();
                 }}
-                aria-label="Claude weekly auto-stop threshold percent"
+                aria-label="Claude Code weekly auto-suspend threshold percent"
               />
             </div>
           </div>
 
           <div className="claude-controls-hint">
-            Enabled limits use this poll rate and stop Claude at the configured usage. With both
-            limits off, Claude uses the global tracked-account poll rate.
+            These shared guardrails apply to every discovered Claude Code account. After QuotaShift
+            suspends Claude Code, both guardrails turn off and must be enabled or configured again
+            if needed. The configured poll rate is the fastest cadence: it is used within 10% of the
+            5-hour threshold or 3% of the weekly threshold. Farther away, polling backs off by 15%
+            per additional 10 percentage points. With both limits off, Claude Code uses the{" "}
+            {"Other idle accounts poll rate"}.
           </div>
         </div>
       )}

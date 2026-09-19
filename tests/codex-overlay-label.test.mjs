@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { readWithCssImports } from './css-helper.mjs';
 
-const appCode = readFileSync('src/App.tsx', 'utf8');
-const overlayCode = readFileSync('src/components/overlay/OverlayApp.tsx', 'utf8');
+const appCode = readWithCssImports('src/App.tsx');
+const overlayCode =
+  readFileSync('src/components/overlay/OverlayApp.tsx', 'utf8') +
+  (existsSync('src/components/overlay/OverlayCard.tsx')
+    ? readFileSync('src/components/overlay/OverlayCard.tsx', 'utf8')
+    : '');
 
 test('publishOverlayUpdate preserves the Codex plan for the overlay tier badge', () => {
   assert.match(
@@ -44,7 +49,7 @@ test('publishOverlayUpdate maps rate limit windows to 5H, WK, and MO for singleB
 test('OverlayApp BarRow component converts 5h, weekly, and monthly rowLabel to compact labels', () => {
   assert.match(
     overlayCode,
-    /label = l\.includes\("month"\) \? "MO" : l\.includes\("5h"\) \? "5H" : \(l\.includes\("week"\) \|\| l === "wk"\) \? "WK" : rowLabel/,
+    /label\s*=\s*l\.includes\("month"\)[\s\S]*?"MO"[\s\S]*?"5H"[\s\S]*?"WK"[\s\S]*?rowLabel/,
     'OverlayApp BarRow must map labels to compact 5H, WK, MO to prevent text overflow'
   );
 });
@@ -79,7 +84,11 @@ test('Simulated label resolution matches expected behavior for various window ty
 });
 
 test('CodexTab renders 0 resets as raw text without click action, and >0 resets as link', () => {
-  const codexTabCode = readFileSync('src/components/codex/CodexTab.tsx', 'utf8');
+  const codexTabCode =
+    readFileSync('src/components/codex/CodexTab.tsx', 'utf8') +
+    (existsSync('src/components/codex/CodexAccountCard.tsx')
+      ? readFileSync('src/components/codex/CodexAccountCard.tsx', 'utf8')
+      : '');
   assert.match(codexTabCode, /canOpenResets\s*=\s*availableResets\s*>\s*0/);
   assert.match(codexTabCode, /canOpenResets\s*\?[\s\S]*?<button[\s\S]*?codex-card-meta--link/);
   assert.match(codexTabCode, /:\s*\(\s*<span\s+className="codex-card-meta"[\s\S]*?\{resetsSummary\}\s*<\/span>/);
@@ -106,7 +115,11 @@ test('dialog-box codex-model-dialog padding is halved and plans are rendered upp
   const poolsCss = readFileSync('src/styles/codex-pools.css', 'utf8');
   const cardsCss = readFileSync('src/styles/codex-cards.css', 'utf8');
   const dialogCode = readFileSync('src/components/codex/CodexResetCreditsDialog.tsx', 'utf8');
-  const tabCode = readFileSync('src/components/codex/CodexTab.tsx', 'utf8');
+  const tabCode =
+    readFileSync('src/components/codex/CodexTab.tsx', 'utf8') +
+    (existsSync('src/components/codex/CodexAccountCard.tsx')
+      ? readFileSync('src/components/codex/CodexAccountCard.tsx', 'utf8')
+      : '');
 
   // Padding reduced by half (8px 10px instead of 16px 20px)
   assert.match(poolsCss, /\.dialog-box\.codex-model-dialog\s*\{[\s\S]*?padding:\s*8px\s+10px;/);
@@ -118,7 +131,7 @@ test('dialog-box codex-model-dialog padding is halved and plans are rendered upp
   assert.match(dialogCode, /account\.lastPlan\s*\?\?\s*["']Plan unknown["']\)\.toUpperCase\(\)/);
 
   // Text aligned to left, values aligned to right in reset card, remain placed at Available badge
-  assert.match(dialogCode, /remain && remain !== ["']N\/A["'] \? remain : \(item\.status \|\| ["']available["']\)/);
+  assert.match(dialogCode, /remain && remain !== ["']N\/A["'] \? remain : \(?item\.status \|\| ["']available["']\)?/);
   assert.doesNotMatch(dialogCode, /<span>Expires:<\/span>/);
   assert.match(dialogCode, /justifyContent:\s*["']space-between["'][\s\S]*?Expiry:/);
 

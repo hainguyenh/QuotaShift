@@ -41,7 +41,11 @@ export const AntigravityCaptureTab: React.FC<AntigravityCaptureTabProps> = ({
         profile = userInfo;
         if (label === "Work Profile" && userInfo?.name) label = userInfo.name;
       } catch {}
-      const capturedAccount: AntigravityAccount | null = extractAntigravitySessionAccount(session, label, profile);
+      const capturedAccount: AntigravityAccount | null = extractAntigravitySessionAccount(
+        session,
+        label,
+        profile,
+      );
       if (!capturedAccount) {
         setCaptureStatusText("Active Antigravity session is invalid or incomplete.");
         return;

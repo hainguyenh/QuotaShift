@@ -20,7 +20,9 @@ export const CodexLocalSessionTab: React.FC<CodexLocalSessionTabProps> = ({
       <div className="account-form" style={{ padding: "4px 0 0" }}>
         <p className="oauth-step-desc" style={{ marginBottom: "12px" }}>
           Import the active session currently logged in via the Codex CLI (
-          <code style={{ background: "var(--border-color)", padding: "2px 4px", borderRadius: "3px" }}>
+          <code
+            style={{ background: "var(--border-color)", padding: "2px 4px", borderRadius: "3px" }}
+          >
             ~/.codex/auth.json
           </code>
           ).

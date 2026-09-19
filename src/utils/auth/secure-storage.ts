@@ -9,16 +9,15 @@ export {
   createTauriSecureStorageBackend,
 } from "./secure-storage-types.js";
 import {
-  SENSITIVE_STORAGE_KEYS,
   isSensitiveStorageKey,
   toError,
-  readString,
   type StorageLike,
   type LegacyStoreLike,
   type SecureStorageBackend,
   type SecureStorageAdapterOptions,
   type SecureStorageFacade,
 } from "./secure-storage-types.js";
+import { migrateLegacySensitiveValues } from "./secure-storage-migration.js";
 
 /**
  * Keeps account credentials in a synchronous renderer map while every
@@ -59,68 +58,12 @@ export class SecureStorageAdapter {
   public async hydrate(decryptedLegacyValues: Record<string, string> = {}): Promise<void> {
     if (this.hydrated) return;
 
-    const secureValues = await this.backend.load();
-    if (!secureValues || typeof secureValues !== "object" || Array.isArray(secureValues)) {
-      throw new Error("Secure storage returned an invalid value map");
-    }
-
-    const storeKeys = await this.store.keys();
-    const nativeKeys: string[] = [];
-    for (let index = 0; index < this.nativeStorage.length; index += 1) {
-      const key = this.nativeStorage.key(index);
-      if (key !== null) nativeKeys.push(key);
-    }
-    const sensitiveKeys = new Set<string>([
-      ...SENSITIVE_STORAGE_KEYS,
-      ...Object.keys(secureValues).filter(isSensitiveStorageKey),
-      ...storeKeys.filter(isSensitiveStorageKey),
-      ...nativeKeys.filter(isSensitiveStorageKey),
-      ...Object.keys(decryptedLegacyValues).filter(isSensitiveStorageKey),
-    ]);
-    const legacyStoreValues = new Map<string, string>();
-    const legacyNativeValues = new Map<string, string>();
-    for (const key of sensitiveKeys) {
-      const storeValue = readString(await this.store.get<unknown>(key));
-      if (storeKeys.includes(key) && storeValue !== undefined) {
-        legacyStoreValues.set(key, storeValue);
-      }
-
-      const nativeValue = this.nativeStorage.getItem(key);
-      if (nativeValue !== null) legacyNativeValues.set(key, nativeValue);
-    }
-
-    const migratedValues = new Map<string, string>();
-    for (const key of sensitiveKeys) {
-      const secureValue = readString(secureValues[key]);
-      if (secureValue !== undefined) {
-        migratedValues.set(key, secureValue);
-        continue;
-      }
-
-      const legacyValue =
-        decryptedLegacyValues[key] ?? legacyStoreValues.get(key) ?? legacyNativeValues.get(key);
-      if (legacyValue === undefined) continue;
-
-      // Do not delete either legacy copy until every secure write succeeds.
-      await this.backend.set(key, legacyValue);
-      migratedValues.set(key, legacyValue);
-    }
-
-    let changedStore = false;
-    for (const key of sensitiveKeys) {
-      if (!migratedValues.has(key)) continue;
-      if (legacyStoreValues.has(key)) {
-        await this.store.delete(key);
-        changedStore = true;
-      }
-    }
-    if (changedStore) await this.store.save();
-
-    for (const key of sensitiveKeys) {
-      if (migratedValues.has(key) && legacyNativeValues.has(key)) {
-        this.nativeStorage.removeItem(key);
-      }
-    }
+    const migratedValues = await migrateLegacySensitiveValues(
+      this.backend,
+      this.store,
+      this.nativeStorage,
+      decryptedLegacyValues,
+    );
 
     this.secureValues.clear();
     this.persistedValues.clear();

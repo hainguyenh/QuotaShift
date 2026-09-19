@@ -3,8 +3,36 @@ use std::path::PathBuf;
 fn repo_file(path: &str) -> String {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let full_path = manifest.join(path);
-    std::fs::read_to_string(&full_path)
+    let mut content = std::fs::read_to_string(&full_path)
         .unwrap_or_else(|error| panic!("failed to read {}: {}", full_path.display(), error))
+        .replace("\r\n", "\n");
+    if path.ends_with("App.tsx") {
+        let submodules = [
+            "../src/components/app/AppModals.tsx",
+            "../src/components/app/AppTabBar.tsx",
+            "../src/hooks/useAppCoordinator.ts",
+            "../src/hooks/useAppBackups.ts",
+            "../src/hooks/useCodexModelScanManager.ts",
+            "../src/hooks/useCodexRouterManager.ts",
+            "../src/hooks/useAppAccountOperations.ts",
+            "../src/hooks/useAntigravityAccountOps.ts",
+            "../src/hooks/useCodexAccountOps.ts",
+            "../src/hooks/useCodexUsageFetcher.ts",
+            "../src/hooks/useAppUsageAndOverlay.ts",
+            "../src/hooks/useAppSessionBootstrap.ts",
+            "../src/hooks/useAppUpdateCheck.ts",
+            "../src/hooks/useAppEventListeners.ts",
+            "../src/utils/common/app-overlay-helpers.ts",
+        ];
+        for sub in submodules {
+            let sub_path = manifest.join(sub);
+            if let Ok(sub_content) = std::fs::read_to_string(&sub_path) {
+                content.push('\n');
+                content.push_str(&sub_content.replace("\r\n", "\n"));
+            }
+        }
+    }
+    content
 }
 
 fn source_slice<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
@@ -87,6 +115,10 @@ fn frontend_prefers_remote_grouped_weekly_quota_before_exact_worker_fallback() {
         helper.contains("exact_grouped"),
         "a grouped cloud summary must suppress the executable-dependent exact fallback"
     );
+    assert!(
+        helper.contains("isAccountPollingSuspended"),
+        "auth-suspended accounts must not fall through into the exact worker fallback"
+    );
 
     let startup = source_slice(
         &app,
@@ -94,24 +126,23 @@ fn frontend_prefers_remote_grouped_weekly_quota_before_exact_worker_fallback() {
         "checkForUpdates();",
     );
     assert!(
-        startup.contains("refreshAntigravityAccountsCloudFirst(agAccounts, true)"),
-        "startup must prefer remote grouped 5-hour + weekly quota for all saved accounts"
+        startup.contains("refreshAntigravityAccountsCloudFirst(agAccounts, false)"),
+        "startup must use normal polling semantics so re-auth-suspended accounts stay out of the refresh list"
     );
     assert!(
         !startup.contains("refreshExactAntigravityAccounts(agAccounts, true)"),
         "startup must not launch exact workers before trying remote grouped quota"
     );
 
-    let listener = source_slice(
+    let idle_poll = source_slice(
         &app,
-        "const setupListeners = async () => {",
-        "const uWindow = await listen<boolean>",
+        "const refreshVisibleIdlePlatforms = () => {",
+        "const timer = window.setInterval(",
     );
     assert!(
-        listener.contains(
-            "refreshAntigravityAccountsCloudFirst(loadAntigravityAccounts(), true).catch(console.error);"
-        ),
-        "normal polling must use the same remote-first quota path"
+        idle_poll
+            .contains("refreshAntigravityAccountsCloudFirst(loadAntigravityAccounts(), false)"),
+        "normal idle polling must use the remote-first path without bypassing re-auth suspension"
     );
 }
 
@@ -129,11 +160,7 @@ fn frontend_uses_remote_first_weekly_refresh_when_tracking_or_adding_an_account(
         "tracking an Antigravity card must request grouped remote weekly quota before exact fallback"
     );
 
-    let add_modal = source_slice(
-        &app,
-        "<AddAntigravityAccountModal",
-        "{/* Export / Import Passphrase Modal */}",
-    );
+    let add_modal = source_slice(&app, "<AddAntigravityAccountModal", "<PassphraseModal");
     assert!(
         add_modal.contains("await refreshAntigravityAccountsCloudFirst([target], true);"),
         "a newly added Antigravity account must request grouped remote weekly quota before exact fallback"

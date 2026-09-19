@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { readWithCssImports } from './css-helper.mjs';
 import {
   isNewerAvatarUrl,
   resolveRefreshedAvatarUrl,
@@ -54,10 +55,13 @@ test('Antigravity refresh fetches user info and updates avatar if newer than loc
   assert.match(code, /profileUrl:\s*fetchedProfileUrl\s*\||\s*account\.profileUrl/);
 });
 
-test('Codex refresh syncs newer avatar URL from decoded profile', () => {
-  const code = fs.readFileSync('src/App.tsx', 'utf8');
+test('Codex refresh caches a missing avatar without refreshing it at poll rate', () => {
+  const code = fs.readFileSync('src/hooks/useCodexUsageFetcher.ts', 'utf8');
 
-  assert.match(code, /resolveRefreshedAvatarUrl\(account\.profileUrl,\s*profile\.picture/);
+  assert.match(code, /avatarLookupAttemptedRef/);
+  assert.match(code, /if \(!account\.profileUrl\) void cacheAvatarIfMissing/);
+  assert.match(code, /fetch_chatgpt_profile/);
+  assert.doesNotMatch(code, /resolveRefreshedAvatarUrl/);
 });
 
 test('Antigravity and Codex tabs heal failed avatar error states when profileUrl changes', () => {

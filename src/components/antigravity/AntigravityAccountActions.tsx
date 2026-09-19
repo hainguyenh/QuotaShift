@@ -1,11 +1,17 @@
 import React from "react";
 import type { AntigravityAccount, AntigravityUsageCacheEntry } from "../../utils/common/types";
+import { isAccountReauthenticationError } from "../../utils/account/account-auth-error";
+import { isAccountPollingSuspended } from "../../utils/account/account-poll-suspension";
+import { ReauthenticateAccountButton } from "../common/ReauthenticateAccountButton";
+import { TrackCurrentAccountIcon } from "../common/TrackCurrentAccountIcon";
+import { ApplyAccountIcon } from "../common/ApplyAccountIcon";
 
 interface AntigravityAccountActionsProps {
   account: AntigravityAccount;
   cache?: AntigravityUsageCacheEntry;
   isApplied: boolean;
   onRefreshQuota: (acc: AntigravityAccount) => void;
+  onReauthenticate: () => void;
   onApply: (acc: AntigravityAccount) => Promise<void>;
   onDelete: (acc: AntigravityAccount) => Promise<void>;
 }
@@ -15,9 +21,14 @@ export const AntigravityAccountActions: React.FC<AntigravityAccountActionsProps>
   cache,
   isApplied,
   onRefreshQuota,
+  onReauthenticate,
   onApply,
   onDelete,
 }) => {
+  const showReauthenticate =
+    isAccountPollingSuspended("antigravity", account.id) ||
+    isAccountReauthenticationError(cache?.error);
+
   return (
     <div
       className="codex-card-header-actions"
@@ -45,6 +56,7 @@ export const AntigravityAccountActions: React.FC<AntigravityAccountActionsProps>
           Last exact {new Date(cache.lastExactFetchedAt).toLocaleString()}
         </span>
       )}
+      {showReauthenticate && <ReauthenticateAccountButton onReauthenticate={onReauthenticate} />}
       <button
         type="button"
         className={`codex-card-refresh-btn${cache?.loading ? " spinning" : ""}`}
@@ -57,27 +69,55 @@ export const AntigravityAccountActions: React.FC<AntigravityAccountActionsProps>
         aria-label={`Refresh quota for ${account.label || account.email || account.id}`}
       >
         <svg viewBox="0 0 24 24" width="11" height="11" fill="none" aria-hidden="true">
-          <path d="M4 12a8 8 0 018-8 8 8 0 016.93 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M18 4l2 4-4-.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M6 20l-2-4 4 .5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M4 12a8 8 0 018-8 8 8 0 016.93 4"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+          <path
+            d="M20 12a8 8 0 01-8 8 8 8 0 01-6.93-4"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+          <path
+            d="M18 4l2 4-4-.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M6 20l-2-4 4 .5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
       {!isApplied ? (
         <button
+          type="button"
           className="card-apply-btn"
           onClick={(e) => {
             e.stopPropagation();
             onApply(account);
           }}
           data-tooltip="Set this account as the active workspace account"
+          aria-label="Set this account as the active workspace account"
         >
-          Apply
+          <ApplyAccountIcon />
         </button>
       ) : (
-        <span className="card-active-badge">
-          <span className="card-active-dot" />
-          Active
+        <span
+          className="card-active-badge"
+          data-tooltip="This is currently active account at this device"
+          aria-label="This is currently active account at this device"
+          role="img"
+        >
+          <TrackCurrentAccountIcon size={12} gradient />
         </span>
       )}
       <button

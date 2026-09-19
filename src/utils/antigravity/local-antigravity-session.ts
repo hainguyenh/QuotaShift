@@ -1,4 +1,9 @@
-import type { AntigravityAccount, FullStatus, LocalAntigravitySession, QuotaData } from "../common/types";
+import type {
+  AntigravityAccount,
+  FullStatus,
+  LocalAntigravitySession,
+  QuotaData,
+} from "../common/types";
 
 export const LOCAL_ANTIGRAVITY_SESSION_KEY = "quotashift_local_antigravity_session_v1";
 

@@ -1,7 +1,8 @@
 import React from "react";
 import type { QuotaData } from "../../utils/common/types";
-import { formatAbsoluteTime } from "../../utils/common/format-time";
+import { formatAbsoluteTime, formatUsageLimitTooltip } from "../../utils/common/format-time";
 import { formatCompactLimitLabel } from "../../utils/common/card-layout-mode";
+import { getUsageTone } from "../../utils/common/usage-tone";
 import { ModelPoolIcon } from "../common/ModelLogos";
 
 interface AntigravityQuotaRowsProps {
@@ -9,7 +10,9 @@ interface AntigravityQuotaRowsProps {
 }
 
 export const AntigravityQuotaRows: React.FC<AntigravityQuotaRowsProps> = ({ quotas }) => {
-  const validQuotas = (quotas || []).filter((q): q is QuotaData => Boolean(q && typeof q === "object"));
+  const validQuotas = (quotas || []).filter((q): q is QuotaData =>
+    Boolean(q && typeof q === "object"),
+  );
   if (!validQuotas.length) return null;
   return (
     <div className="codex-card-limits antigravity-quota-list">
@@ -27,10 +30,7 @@ export const AntigravityQuotaRows: React.FC<AntigravityQuotaRowsProps> = ({ quot
             ? formatAbsoluteTime(quota.weeklyReset)
             : "Ready";
         return (
-          <div
-            key={`${quota.model || index}-${index}`}
-            className="antigravity-quota-group"
-          >
+          <div key={`${quota.model || index}-${index}`} className="antigravity-quota-group">
             <div className="quota-item-header">
               <span className="quota-model-name" title={quota.model}>
                 <span className="label-full">{quota.model}</span>
@@ -42,13 +42,13 @@ export const AntigravityQuotaRows: React.FC<AntigravityQuotaRowsProps> = ({ quot
             <div className="quota-limits-container">
               {[
                 {
-                  label: "5 hrs limit",
+                  label: "5 hrs",
                   known: fiveKnown,
                   percent: quota.fiveHourPercent,
                   reset: fiveReset,
                 },
                 {
-                  label: "Weekly limit",
+                  label: "Weekly",
                   known: weeklyKnown,
                   percent: quota.weeklyPercent,
                   reset: weeklyReset,
@@ -56,18 +56,22 @@ export const AntigravityQuotaRows: React.FC<AntigravityQuotaRowsProps> = ({ quot
               ].map((lane) => (
                 <div className="quota-limit-col" key={lane.label}>
                   <div className="quota-limit-label-container">
-                    <span className="quota-limit-name" title={lane.label}>
+                    <span className="quota-limit-name">
                       <span className="label-full">{lane.label}</span>
                       <span className="label-compact">{formatCompactLimitLabel(lane.label)}</span>
                     </span>
-                    <span
-                      className="quota-limit-reset"
-                      title={lane.known ? lane.reset : "Unavailable"}
-                    >
+                    <span className="quota-limit-reset">
                       {lane.known ? lane.reset : "Unavailable"}
                     </span>
                   </div>
-                  <div className="quota-limit-bar-container">
+                  <div
+                    className="quota-limit-bar-container"
+                    data-usage-tone={getUsageTone(lane.known ? lane.percent : null)}
+                    data-tooltip={formatUsageLimitTooltip(
+                      lane.label,
+                      lane.known ? lane.reset : "Unavailable",
+                    )}
+                  >
                     {lane.known ? (
                       <>
                         <div className="progress-container">

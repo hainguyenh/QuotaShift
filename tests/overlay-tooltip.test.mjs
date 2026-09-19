@@ -1,6 +1,6 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
 
 import {
   formatResetExpiry,
@@ -8,118 +8,135 @@ import {
   getOverlayTooltipText,
   detectOverlayHoverZone,
   computeOverlayTooltipPlacement,
-} from '../src/utils/common/overlay-tooltip.ts';
+} from "../src/utils/common/overlay-tooltip.ts";
 
-const overlayAppCode = readFileSync('src/components/overlay/OverlayApp.tsx', 'utf8');
-const overlayCssCode = readFileSync('src/styles/overlay.css', 'utf8');
-const overlayTooltipAppCode = readFileSync('src/components/overlay/OverlayTooltipApp.tsx', 'utf8');
+const overlayAppCode =
+  readFileSync("src/components/overlay/OverlayApp.tsx", "utf8") +
+  (existsSync("src/components/overlay/OverlayCard.tsx")
+    ? readFileSync("src/components/overlay/OverlayCard.tsx", "utf8")
+    : "") +
+  (existsSync("src/components/overlay/useOverlayDrag.ts")
+    ? readFileSync("src/components/overlay/useOverlayDrag.ts", "utf8")
+    : "");
+const overlayCssCode = readFileSync("src/styles/overlay.css", "utf8");
+const overlayTooltipAppCode = readFileSync("src/components/overlay/OverlayTooltipApp.tsx", "utf8");
 
-test('formatResetExpiry formats dates into "MMM D - h:mm A" local time', () => {
+test('formatResetExpiry formats dates into "MMM D - HH:mm" local time', () => {
   // Test with explicit Date
   const d = new Date(2026, 5, 14, 22, 0); // June 14, 2026 at 22:00 (10:00 PM)
-  assert.equal(formatResetExpiry(d.toISOString()), 'Jun 14 - 10:00 PM');
+  assert.equal(formatResetExpiry(d.toISOString()), "Jun 14 - 22:00");
 
   const morningDate = new Date(2026, 0, 5, 9, 5); // Jan 5, 2026 at 09:05 (9:05 AM)
-  assert.equal(formatResetExpiry(morningDate.toISOString()), 'Jan 5 - 9:05 AM');
+  assert.equal(formatResetExpiry(morningDate.toISOString()), "Jan 5 - 09:05");
 
   // Returns empty string for invalid / null dates
-  assert.equal(formatResetExpiry(null), '');
-  assert.equal(formatResetExpiry(undefined), '');
-  assert.equal(formatResetExpiry('invalid-date'), '');
+  assert.equal(formatResetExpiry(null), "");
+  assert.equal(formatResetExpiry(undefined), "");
+  assert.equal(formatResetExpiry("invalid-date"), "");
 });
 
-test('resolveOverlayPlatformName returns formatted platform names', () => {
-  assert.equal(resolveOverlayPlatformName('antigravity'), 'Antigravity');
-  assert.equal(resolveOverlayPlatformName('codex'), 'ChatGPT Codex');
-  assert.equal(resolveOverlayPlatformName('claude'), 'Claude');
+test("resolveOverlayPlatformName returns formatted platform names", () => {
+  assert.equal(resolveOverlayPlatformName("antigravity"), "Antigravity");
+  assert.equal(resolveOverlayPlatformName("codex"), "ChatGPT Codex");
+  assert.equal(resolveOverlayPlatformName("claude"), "Claude Code");
 });
 
 test('getOverlayTooltipText formats Avatar hover as "name - email"', () => {
   const data = {
-    provider: 'codex',
-    label: 'Personal',
-    email: 'user@example.com',
+    provider: "codex",
+    label: "Personal",
+    email: "user@example.com",
   };
-  assert.equal(getOverlayTooltipText('avatar', data, 'PRO'), 'Personal - user@example.com');
+  assert.equal(getOverlayTooltipText("avatar", data, "PRO"), "Personal - user@example.com");
 
   const dataNoEmail = {
-    provider: 'antigravity',
-    label: 'Primary',
+    provider: "antigravity",
+    label: "Primary",
     email: null,
   };
-  assert.equal(getOverlayTooltipText('avatar', dataNoEmail, 'PRO'), 'Primary');
+  assert.equal(getOverlayTooltipText("avatar", dataNoEmail, "PRO"), "Primary");
 });
 
 test('getOverlayTooltipText formats Tier badge and Platform logo hover as "{platform} - {Tier uppercase}"', () => {
   assert.equal(
-    getOverlayTooltipText('tier_platform', { provider: 'antigravity', label: 'A', tier: 'PRO' }, 'PRO'),
-    'Antigravity - PRO'
+    getOverlayTooltipText(
+      "tier_platform",
+      { provider: "antigravity", label: "A", tier: "PRO" },
+      "PRO",
+    ),
+    "Antigravity - PRO",
   );
   assert.equal(
-    getOverlayTooltipText('tier_platform', { provider: 'codex', label: 'C', tier: 'FREE' }, 'FREE'),
-    'ChatGPT Codex - FREE'
+    getOverlayTooltipText("tier_platform", { provider: "codex", label: "C", tier: "FREE" }, "FREE"),
+    "ChatGPT Codex - FREE",
   );
   assert.equal(
-    getOverlayTooltipText('tier_platform', { provider: 'claude', label: 'Cl', tier: 'pro' }, 'PRO'),
-    'Claude - PRO'
+    getOverlayTooltipText("tier_platform", { provider: "claude", label: "Cl", tier: "pro" }, "PRO"),
+    "Claude Code - PRO",
   );
 });
 
-test('getOverlayTooltipText formats Reset times for ChatGPT codex account', () => {
+test("getOverlayTooltipText formats Reset times for ChatGPT codex account", () => {
   const d = new Date(2026, 5, 14, 22, 0); // June 14, 2026 at 10:00 PM
   const dataWithExpiry = {
-    provider: 'codex',
-    label: 'Codex',
+    provider: "codex",
+    label: "Codex",
     resetCount: 3,
     resetNearestExpiresAt: d.toISOString(),
   };
   assert.equal(
-    getOverlayTooltipText('reset', dataWithExpiry, 'PRO'),
-    '3 reset(s) remaining - nearest expiry at Jun 14 - 10:00 PM'
+    getOverlayTooltipText("reset", dataWithExpiry, "PRO"),
+    "3 reset(s) remaining - nearest expiry at Jun 14 - 22:00",
   );
 
   const dataWithoutExpiry = {
-    provider: 'codex',
-    label: 'Codex',
+    provider: "codex",
+    label: "Codex",
     resetCount: 1,
     resetNearestExpiresAt: null,
   };
-  assert.equal(
-    getOverlayTooltipText('reset', dataWithoutExpiry, 'FREE'),
-    '1 reset(s) remaining'
-  );
+  assert.equal(getOverlayTooltipText("reset", dataWithoutExpiry, "FREE"), "1 reset(s) remaining");
 });
 
 test('getOverlayTooltipText formats Other zone as "Drag to move - Double click to open dashboard."', () => {
-  const data = { provider: 'antigravity', label: 'Main' };
+  const data = { provider: "antigravity", label: "Main" };
   assert.equal(
-    getOverlayTooltipText('other', data, 'PRO'),
-    'Drag to move - Double click to open dashboard.'
+    getOverlayTooltipText("other", data, "PRO"),
+    "Drag to move - Double click to open dashboard.",
   );
-  assert.equal(getOverlayTooltipText(null, data, 'PRO'), null);
+  assert.equal(getOverlayTooltipText(null, data, "PRO"), null);
 });
 
-test('detectOverlayHoverZone accurately identifies zones from closest elements', () => {
+test("detectOverlayHoverZone accurately identifies zones from closest elements", () => {
   const makeEl = (classes) => ({
     closest: (selector) => {
-      const cls = selector.replace(/^\./, '');
+      const cls = selector.replace(/^\./, "");
       return classes.includes(cls) ? {} : null;
     },
   });
 
   // Nested in overlay-avatar-wrap:
-  assert.equal(detectOverlayHoverZone(makeEl(['overlay-reset-badge', 'overlay-avatar-wrap', 'glass-card'])), 'reset');
-  assert.equal(detectOverlayHoverZone(makeEl(['overlay-tier-badge', 'overlay-avatar-wrap', 'glass-card'])), 'tier_platform');
-  assert.equal(detectOverlayHoverZone(makeEl(['overlay-provider-badge', 'overlay-avatar-wrap', 'glass-card'])), 'tier_platform');
-  assert.equal(detectOverlayHoverZone(makeEl(['overlay-avatar-wrap', 'glass-card'])), 'avatar');
+  assert.equal(
+    detectOverlayHoverZone(makeEl(["overlay-reset-badge", "overlay-avatar-wrap", "glass-card"])),
+    "reset",
+  );
+  assert.equal(
+    detectOverlayHoverZone(makeEl(["overlay-tier-badge", "overlay-avatar-wrap", "glass-card"])),
+    "tier_platform",
+  );
+  assert.equal(
+    detectOverlayHoverZone(makeEl(["overlay-provider-badge", "overlay-avatar-wrap", "glass-card"])),
+    "tier_platform",
+  );
+  assert.equal(detectOverlayHoverZone(makeEl(["overlay-avatar-wrap", "glass-card"])), "avatar");
 
   // Other card elements
-  assert.equal(detectOverlayHoverZone(makeEl(['glass-card'])), 'other');
-  assert.equal(detectOverlayHoverZone(makeEl(['overlay-metrics', 'glass-card'])), 'other');
+  assert.equal(detectOverlayHoverZone(makeEl(["glass-card"])), "other");
+  assert.equal(detectOverlayHoverZone(makeEl(["overlay-metrics", "glass-card"])), "other");
   assert.equal(detectOverlayHoverZone(null), null);
 });
 
-test('OverlayApp and styles.css implement liquid glass custom tooltip anchored at center bottom with arrow', () => {
+test("OverlayApp and styles.css implement liquid glass custom tooltip anchored at center bottom with arrow", () => {
   // OverlayApp mounts tooltip when showTooltip is true
   assert.match(overlayAppCode, /className="overlay-tooltip"/);
   assert.match(overlayAppCode, /className="overlay-tooltip-text"/);
@@ -132,6 +149,7 @@ test('OverlayApp and styles.css implement liquid glass custom tooltip anchored a
   assert.match(overlayCssCode, /left:\s*50%;/);
   assert.match(overlayCssCode, /transform:\s*translateX\(-50%\);/);
   assert.match(overlayCssCode, /backdrop-filter:\s*blur\(16px\)\s*saturate\(190%\);/);
+  assert.match(overlayCssCode, /\.overlay-tooltip\s*\{[\s\S]*?box-shadow:\s*none;/);
 
   // CSS defines arrow pointing up to center bottom of overlay
   assert.match(overlayCssCode, /\.overlay-tooltip::after\s*\{/);
@@ -139,7 +157,7 @@ test('OverlayApp and styles.css implement liquid glass custom tooltip anchored a
   assert.match(overlayCssCode, /border-top:\s*1px solid rgba\(255, 255, 255/);
 });
 
-test('computeOverlayTooltipPlacement places below by default and flips above when near screen bottom', () => {
+test("computeOverlayTooltipPlacement places below by default and flips above when near screen bottom", () => {
   // Ample room below: card at y=100, monitor bottom at y=1080
   const belowResult = computeOverlayTooltipPlacement({
     cardRect: { left: 0, top: 0, width: 238, height: 54 },
@@ -149,7 +167,7 @@ test('computeOverlayTooltipPlacement places below by default and flips above whe
     tooltipHeight: 38,
     scale: 1,
   });
-  assert.equal(belowResult.placement, 'below');
+  assert.equal(belowResult.placement, "below");
   assert.equal(belowResult.y, 100 + 54 - 4); // cardScreenBottom - 4
   assert.equal(belowResult.x, 500 + (238 - 340) / 2); // centered
 
@@ -162,11 +180,11 @@ test('computeOverlayTooltipPlacement places below by default and flips above whe
     tooltipHeight: 38,
     scale: 1,
   });
-  assert.equal(aboveResult.placement, 'above');
+  assert.equal(aboveResult.placement, "above");
   assert.equal(aboveResult.y, 1006 - 38 + 4); // cardScreenY - tooltipHeight + 4
 });
 
-test('OverlayTooltipApp renders separate overlay instance with event listener and positioning', () => {
+test("OverlayTooltipApp renders separate overlay instance with event listener and positioning", () => {
   assert.match(overlayTooltipAppCode, /export const OverlayTooltipApp/);
   assert.match(overlayTooltipAppCode, /overlay-tooltip-data/);
   assert.match(overlayTooltipAppCode, /getCurrentWebviewWindow/);
@@ -177,16 +195,16 @@ test('OverlayTooltipApp renders separate overlay instance with event listener an
   assert.match(overlayTooltipAppCode, /overlay-tooltip--\$\{data\.placement\}/);
 });
 
-test('OverlayApp implements 500ms hover delay and stays visible until mouse leave', () => {
+test("OverlayApp implements 500ms hover delay and stays visible until mouse leave", () => {
   // Hover timer set for 500ms
   assert.match(overlayAppCode, /hoverTimerRef/);
-  assert.match(overlayAppCode, /window\.setTimeout\(.+,\s*500\)/);
+  assert.match(overlayAppCode, /window\.setTimeout\([\s\S]+?,\s*500\)/);
   // Clears on mouse leave and drag
   assert.match(overlayAppCode, /onMouseLeave=\{clearHover\}/);
   assert.match(overlayAppCode, /setActiveTooltipZone\(null\)/);
 });
 
-test('computeOverlayTooltipPlacement aligns tooltip window center with card center for all platforms and DPI scales', () => {
+test("computeOverlayTooltipPlacement aligns tooltip window center with card center for all platforms and DPI scales", () => {
   for (const scale of [1, 1.25, 1.5, 2]) {
     // Antigravity (340px window, 332px card, left: 4)
     const agRes = computeOverlayTooltipPlacement({
@@ -216,7 +234,7 @@ test('computeOverlayTooltipPlacement aligns tooltip window center with card cent
   }
 });
 
-test('computeOverlayTooltipPlacement strictly preserves center alignment even near screen edges', () => {
+test("computeOverlayTooltipPlacement strictly preserves center alignment even near screen edges", () => {
   const res = computeOverlayTooltipPlacement({
     cardRect: { left: 4, top: 6, width: 332, height: 54 },
     windowPos: { x: 1638, y: 950 },
@@ -230,7 +248,7 @@ test('computeOverlayTooltipPlacement strictly preserves center alignment even ne
   assert.equal(tooltipCenter, cardCenter);
 });
 
-test('computeOverlayTooltipPlacement dynamically aligns tooltip with actual getBoundingClientRect position (e.g. flex-centered Codex card)', () => {
+test("computeOverlayTooltipPlacement dynamically aligns tooltip with actual getBoundingClientRect position (e.g. flex-centered Codex card)", () => {
   const res = computeOverlayTooltipPlacement({
     cardRect: { left: 23, top: 6, width: 228, height: 54 },
     windowPos: { x: 500, y: 300 },
@@ -243,3 +261,69 @@ test('computeOverlayTooltipPlacement dynamically aligns tooltip with actual getB
   assert.equal(tooltipCenter, cardCenter);
 });
 
+test("OverlayTooltipApp centers its actual native window on the requested physical anchor", () => {
+  assert.match(overlayTooltipAppCode, /await applyScale\(\)/);
+  assert.match(overlayTooltipAppCode, /const outerSize = await win\.outerSize\(\)/);
+  assert.match(
+    overlayTooltipAppCode,
+    /Math\.round\(payload\.cardCenterX - outerSize\.width \/ 2\)/,
+  );
+  assert.match(
+    overlayTooltipAppCode,
+    /win\.setPosition\(new PhysicalPosition\(targetX, payload\.y\)\)/,
+  );
+});
+
+test("computeOverlayTooltipPlacement keeps the tooltip center on the overlay center at UI scaling", () => {
+  for (const uiScale of [0.8, 1, 1.25, 1.4, 2]) {
+    const dpr = 1.5;
+    const tooltipWidth = 340 * uiScale * dpr;
+    const result = computeOverlayTooltipPlacement({
+      cardRect: { left: 4, top: 6, width: 230 * uiScale, height: 54 * uiScale },
+      windowPos: { x: 300, y: 180 },
+      tooltipWidth,
+      tooltipHeight: 38 * uiScale * dpr,
+      scale: dpr,
+    });
+    assert.equal(Math.round(result.x + tooltipWidth / 2), Math.round(result.cardCenterX));
+  }
+});
+
+test("OverlayApp centers the standalone tooltip from the actual overlay window bounds", () => {
+  const appOnly = readFileSync("src/components/overlay/OverlayApp.tsx", "utf8");
+
+  assert.match(appOnly, /Promise\.all\(\[win\.outerPosition\(\), win\.outerSize\(\)\]\)/);
+  assert.match(appOnly, /const overlayCenterX = wPos\.x \+ overlaySize\.width \/ 2/);
+  assert.match(appOnly, /x:\s*Math\.round\(overlayCenterX - tooltipWidth \/ 2\)/);
+  assert.doesNotMatch(appOnly, /getBoundingClientRect\(\)[\s\S]*overlay-tooltip-data/);
+});
+
+test("standalone tooltip scales around its own center instead of zooming the root", () => {
+  const guardrailCss = readFileSync("src/styles/overlay-guardrails.css", "utf8");
+
+  assert.doesNotMatch(
+    guardrailCss,
+    /\.overlay-tooltip-root\s*\{[\s\S]*?zoom:\s*var\(--overlay-ui-scale/,
+  );
+  assert.match(
+    guardrailCss,
+    /\.overlay-tooltip-root \.overlay-tooltip\s*\{[\s\S]*?transform:\s*scale\(var\(--overlay-ui-scale, 1\)\);[\s\S]*?transform-origin:\s*center;/,
+  );
+});
+
+test("standalone tooltip is non-focusable so menu hover is not interrupted", () => {
+  assert.match(overlayTooltipAppCode, /win\.setFocusable\(false\)/);
+});
+
+test("menu tooltip payload is marked so Black & White can add only its fake border", () => {
+  const menuCode = readFileSync("src/components/overlay/OverlayContextMenu.tsx", "utf8");
+  const themeCss = readFileSync("src/styles/overlay-themes.css", "utf8");
+
+  assert.match(menuCode, /source:\s*"menu"/);
+  assert.match(overlayTooltipAppCode, /data\.source === "menu"/);
+  assert.match(themeCss, /\.overlay-tooltip--menu\s*\{/);
+  assert.match(
+    themeCss,
+    /\.overlay-tooltip--menu\s*\{[\s\S]*box-shadow:\s*inset 0 0 0 1px var\(--overlay-mono-edge\)/,
+  );
+});

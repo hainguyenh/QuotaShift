@@ -1,0 +1,100 @@
+.card-apply-btn {
+  align-self: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 0;
+  box-sizing: border-box;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.card-apply-btn:hover {
+  color: #f59e0b;
+  border-color: var(--border-hover);
+  background: var(--codex-accent-dim);
+}
+
+.card-apply-btn:active {
+  transform: scale(0.96);
+}
+
+.apply-account-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+@keyframes warm-action-color-shift {
+  0%,
+  100% {
+    color: #facc15;
+    filter: drop-shadow(0 0 2px rgba(250, 204, 21, 0.5));
+    transform: scale(1);
+  }
+  50% {
+    color: #f97316;
+    filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.72));
+    transform: scale(1.08);
+  }
+}
+
+.card-apply-btn:hover .apply-account-icon {
+  transform-origin: center;
+  animation: warm-action-color-shift 1.8s ease-in-out infinite;
+}
+
+.card-active-badge {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  line-height: 0;
+  box-sizing: border-box;
+}
+
+@keyframes active-account-gradient-shift {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(250, 204, 21, 0.55));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.72));
+    transform: scale(1.08);
+  }
+}
+
+.card-active-badge .track-current-account-icon--gradient {
+  display: block;
+  transform-origin: center;
+  animation: active-account-gradient-shift 2.2s ease-in-out infinite;
+}
+
+[data-theme="light"] .card-apply-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+[data-theme="light"] .card-apply-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--border-hover);
+}

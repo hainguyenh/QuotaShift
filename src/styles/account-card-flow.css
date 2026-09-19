@@ -1,0 +1,111 @@
+/* Responsive account-card flow shared by Antigravity, Codex, and Claude Code. */
+.codex-accounts-container {
+  display: grid;
+  grid-template-columns: repeat(var(--account-card-columns, 1), minmax(0, 1fr));
+  align-content: start;
+  gap: 6px;
+}
+
+.claude-accounts-flow {
+  display: grid;
+  grid-template-columns: repeat(var(--account-card-columns, 1), minmax(0, 1fr));
+  align-content: start;
+  gap: 6px;
+}
+
+.codex-accounts-container > .account-card,
+.claude-accounts-flow > .account-card,
+.monitored-account-list > .account-card {
+  min-width: 0;
+  margin-right: 0;
+}
+
+.tab-panel--antigravity .monitored-account-list {
+  display: contents;
+}
+
+.tab-panel--antigravity .local-session-card {
+  margin-right: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.codex-card-header {
+  justify-content: flex-start;
+}
+
+.codex-card-title-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.codex-card-header-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.account-card-email-tier-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.account-card-email-tier-row .codex-card-email-info {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-card-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .account-card-plan-badge {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.account-card-grid--reordering {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.account-card-grid--reordering .account-card {
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    opacity 0.12s ease,
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.account-card-grid--reordering .account-card--dragging {
+  z-index: 3;
+  opacity: 0.9;
+  transform: scale(1.012);
+  border-color: color-mix(in srgb, var(--accent-color, #eab308) 58%, var(--border-color));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  cursor: grabbing;
+}
+
+[data-theme="light"] .account-card-grid--reordering .account-card--dragging {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}

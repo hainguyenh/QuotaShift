@@ -1,7 +1,9 @@
 use tauri::Manager;
 
 use crate::types::{CodexMonitoredInfo, FullStatus};
-use crate::window_manager::{poll_and_update_tray, show_main_dashboard, update_tray_only};
+use crate::window_manager::{
+    open_main_window, poll_and_update_tray, quit_application, update_tray_only,
+};
 use crate::{antigravity_keep_alive, codex_sync, get_state, keep_alive, logger, quota, session};
 
 #[tauri::command]
@@ -273,7 +275,12 @@ pub fn open_logs_folder() -> Result<(), String> {
 
 #[tauri::command]
 pub fn show_dashboard(app_handle: tauri::AppHandle) {
-    show_main_dashboard(&app_handle, "overlay_click");
+    open_main_window(&app_handle, "overlay_click");
+}
+
+#[tauri::command]
+pub fn quit_app(app_handle: tauri::AppHandle) {
+    quit_application(&app_handle, "header_quit");
 }
 
 #[tauri::command]

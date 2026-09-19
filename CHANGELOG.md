@@ -2,7 +2,65 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.1.0] - 2026-09-19
+
+### Added
+
+- **Desktop Window Controls & Custom Shell**:
+  - QuotaShift now opens as a normal borderless desktop window (`decorations: false`, `minWidth: 912`, `minHeight: 520`, default `960×700`) with custom titlebar controls: Minimize, Maximize/Restore, Close-to-Tray, and a confirmed Quit dialog.
+  - Added native 8-direction edge and corner resize handles (`WindowResizeHandles`) without window decoration flicker or conflicts with titlebar drag regions.
+  - Closing the window hides to system tray; right-clicking the tray icon provides direct access to open the dashboard, toggle the overlay, refresh usage, or quit.
+- **Native Main-Window Zoom**:
+  - Added persisted WebView zoom ranging from 70% to 190% in 10% steps.
+  - Supports keyboard shortcuts (`Ctrl+=`, `Ctrl+-`, `Ctrl+0`) and Ctrl+mouse-wheel zooming.
+- **Claude Code Multi-Profile Monitoring**:
+  - Added support for monitoring multiple Claude Code profiles keyed by their `CLAUDE_CONFIG_DIR` directories without modifying user credentials.
+  - Automatic discovery of local Claude Code profiles, alongside manual profile directory addition via `ClaudeAddAccountModal`.
+  - Account card visual and interaction parity with Antigravity and Codex cards: card header, tier badges, usage tone indicators, formatted limit labels, copy config directory path, and reauthenticate action buttons.
+  - Added active local session detection: automatically resolves running Claude Code CLI sessions to the active profile.
+- **Claude Code Guardrails & Safe Process Suspension**:
+  - Independent 5-hour and weekly quota threshold stop switches with adaptive guardrail polling intervals.
+  - One-shot suspension mechanism: automatically suspends Claude Code CLI and background processes when usage exceeds configured thresholds, auto-disabling switches upon trigger.
+  - Cross-platform native OS notifications (`tauri-plugin-notification`) and in-app alert banners upon guardrail suspension.
+  - Safe process resumption: verifies exact PID, process start time, and profile directory before resuming; optional auto-resume at quota reset only triggers when all relevant quota windows reset and telemetry data is fresh and valid.
+- **Vertical Settings Navigation**:
+  - Reorganized Settings into a clean five-section vertical sidebar: Monitoring, Appearance, Keyboard Shortcuts, Data, and Overlay.
+  - Replaced legacy HTML checkboxes with accessible segmented `<Switch>` button toggles.
+  - Keyboard shortcuts now feature individual enable/disable toggle switches that unregister listeners and dim disabled bindings.
+- **Responsive Account Card Columns**:
+  - Added dynamic 1 to 4 column responsive grid layout (`useAccountCardGridColumns`) that scales with container width.
+  - Added toggleable Compact and Expanded card layout modes persisted to `localStorage`.
+- **Desktop Overlay Enhancements**:
+  - Floating translucent HUD with selectable Glassmorphism and Black & White themes synchronized with the application theme.
+  - Dedicated Overlay UI scale controls (80% to 200%) from a fixed 340×80 base geometry with uniform whole-surface scaling.
+  - Multi-monitor screen edge clamping on Windows with persistent window coordinates.
+  - Overlay right-click context menu: Refresh Tracked Account, Open Full Dashboard, Toggle Theme, and Hide Overlay.
+  - Provider-specific branding logos and tier badges for Google Antigravity, OpenAI Codex, and Claude Code.
+- **Authentication Resilience & Polling Suspension**:
+  - Automatic error detection and polling suspension for unauthenticated or expired accounts (`useAccountPollSuspension`) to eliminate quota request spam on 401/403 errors.
+  - Visual error banners on affected account cards with a direct Reauthenticate action.
+
+### Changed
+
+- Replaced the tray-attached dashboard panel with a standalone desktop window; closing hides to tray and the tray menu reopens QuotaShift without tray-edge positioning.
+- Removed legacy CSS panel scaling in favor of native WebView zoom.
+- Overlay sizing is provider-independent and follows measured content, expanding when necessary to prevent clipping while avoiding redundant native resize calls.
+- Updated shared refresh artwork across header and card controls to use the approved dual-arrow SVG design.
+- Replaced Data import and export action buttons with approved SVG icons.
+- Updated header logo to theme-aware 512px assets (`quota-shift-logo-512.png` and `quota-shift-logo-dark-512.png`) that visually fill the titlebar frame.
+- Release download priority is standardized to Windows → macOS → Linux.
+- Bumped application version to 1.1.0 across `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`.
+
+### Fixed
+
+- Codex tracked tray quota stays synchronized after startup and subsequent usage refreshes.
+- Newly added Codex accounts persist their detected subscription tier, and multi-workspace browser login refreshes every created workspace.
+- Claude shows `Resets tomorrow at ...` for next-local-calendar-day resets and reopens directly to the Claude tab when Claude is tracked.
+- Track Current Account accepts raw Codex `auth.json` text returned by the backend and publishes the complete monitored-account usage payload.
+- Tracked Codex tray usage is preserved when Antigravity polling is unavailable.
+- Borderless resize handles no longer compete with titlebar dragging; tracked-account UI state stays synchronized; legacy Codex tracking fallback remains available; failed overlay resizes can retry.
+- Prevented unauthenticated Claude profiles from triggering infinite polling loops on quota error responses.
+- Fixed overlay window coordinate drifts when dragging near multi-monitor boundary edges.
 
 ## [1.0.6] - 2026-09-15
 

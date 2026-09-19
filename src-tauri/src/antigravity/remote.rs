@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use crate::types::AntigravityUsageCommandError;
+use std::time::Duration;
 
 const CLOUD_CODE_PROJECT_BASE_URL: &str = "https://cloudcode-pa.googleapis.com";
 const CLOUD_CODE_QUOTA_BASE_URL: &str = "https://daily-cloudcode-pa.googleapis.com";
@@ -13,7 +12,30 @@ fn antigravity_ide_version() -> String {
         .unwrap_or(ANTIGRAVITY_IDE_VERSION)
         .to_string()
 }
-
+fn mask_email(email: Option<&str>) -> String {
+    let Some((local, domain)) = email.and_then(|value| value.trim().split_once('@')) else {
+        return "account".to_string();
+    };
+    if local.is_empty() || domain.is_empty() {
+        return "account".to_string();
+    }
+    let chars: Vec<char> = local.chars().collect();
+    let head: String = chars.iter().take(2).collect();
+    let tail_start = chars.len().saturating_sub(2).max(head.chars().count());
+    let tail: String = chars.iter().skip(tail_start).collect();
+    format!("{}***{}@{}", head, tail, domain)
+}
+fn endpoint_name(url: &str) -> &'static str {
+    if url.contains("loadCodeAssist") {
+        "loadCodeAssist"
+    } else if url.contains("retrieveUserQuotaSummary") {
+        "retrieveUserQuotaSummary"
+    } else if url.contains("fetchAvailableModels") {
+        "fetchAvailableModels"
+    } else {
+        "request"
+    }
+}
 fn platform_metadata() -> u8 {
     #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
     {
@@ -38,7 +60,6 @@ fn platform_metadata() -> u8 {
     #[allow(unreachable_code)]
     0
 }
-
 fn platform_user_agent_segment() -> &'static str {
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     {
@@ -77,7 +98,6 @@ pub(crate) struct AntigravityRemoteConfig {
     pub client_version: String,
     pub timeout: Duration,
 }
-
 impl Default for AntigravityRemoteConfig {
     fn default() -> Self {
         let version = antigravity_ide_version();
@@ -100,8 +120,8 @@ impl Default for AntigravityRemoteConfig {
 pub(crate) struct AntigravityRemoteClient {
     http: reqwest::Client,
     config: AntigravityRemoteConfig,
+    diagnostic_identity: String,
 }
-
 impl AntigravityRemoteClient {
     pub(crate) fn new(
         config: AntigravityRemoteConfig,
@@ -114,13 +134,19 @@ impl AntigravityRemoteClient {
                 message: format!("HTTP client init failed: {}", e),
                 retryable: true,
             })?;
-        Ok(Self { http, config })
+        Ok(Self {
+            http,
+            config,
+            diagnostic_identity: "account".to_string(),
+        })
     }
-
     pub(crate) fn production() -> Result<Self, AntigravityUsageCommandError> {
         Self::new(AntigravityRemoteConfig::default())
     }
-
+    pub(crate) fn with_diagnostic_email(mut self, email: Option<&str>) -> Self {
+        self.diagnostic_identity = mask_email(email);
+        self
+    }
     pub(crate) async fn load_code_assist(
         &self,
         access_token: &str,
@@ -136,12 +162,6 @@ impl AntigravityRemoteClient {
         });
         self.send_post(&url, access_token, body, false).await
     }
-
-    /// Fetch Antigravity's authoritative grouped quota summary. The endpoint is
-    /// newer than fetchAvailableModels, so unsupported/transient responses are
-    /// treated as an optional miss and the caller can fall back to the legacy
-    /// model catalog. Authentication failures remain fatal so token refresh can
-    /// happen normally.
     pub(crate) async fn retrieve_user_quota_summary(
         &self,
         access_token: &str,
@@ -156,17 +176,11 @@ impl AntigravityRemoteClient {
             match self.send_post(&url, access_token, body.clone(), true).await {
                 Ok(value) => return Ok(Some(value)),
                 Err(error) if error.code == "ANTIGRAVITY_REAUTH_REQUIRED" => return Err(error),
-                Err(error) => {
-                    eprintln!(
-                        "[antigravity_remote] quota summary unavailable at {}: {}",
-                        base_url, error.message
-                    );
-                }
+                Err(_) => {}
             }
         }
         Ok(None)
     }
-
     pub(crate) async fn fetch_available_models(
         &self,
         access_token: &str,
@@ -182,7 +196,6 @@ impl AntigravityRemoteClient {
         };
         self.send_post(&url, access_token, body, true).await
     }
-
     async fn send_post(
         &self,
         url: &str,
@@ -190,28 +203,31 @@ impl AntigravityRemoteClient {
         body: serde_json::Value,
         include_client_headers: bool,
     ) -> Result<serde_json::Value, AntigravityUsageCommandError> {
-        eprintln!("[antigravity_remote] ---> POST {}", url);
-
+        let endpoint = endpoint_name(url);
         let mut request = self
             .http
             .post(url)
             .bearer_auth(access_token)
             .header("User-Agent", &self.config.user_agent)
             .header("Content-Type", "application/json");
-
         if include_client_headers {
             request = request
                 .header("X-Client-Name", &self.config.client_name)
                 .header("X-Client-Version", &self.config.client_version);
         }
-
-        let res = request.json(&body).send().await;
-
-        let res = match res {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("[antigravity_remote] <--- Connection error: {}", e);
-                if e.is_timeout() {
+        let res = match request.json(&body).send().await {
+            Ok(response) => response,
+            Err(error) => {
+                let result = if error.is_timeout() {
+                    "timeout"
+                } else {
+                    "network_error"
+                };
+                eprintln!(
+                    "[antigravity_remote] {} {} {}",
+                    self.diagnostic_identity, endpoint, result
+                );
+                if error.is_timeout() {
                     return Err(AntigravityUsageCommandError {
                         code: "ANTIGRAVITY_USAGE_TIMEOUT".to_string(),
                         message: "Request timed out".to_string(),
@@ -220,18 +236,20 @@ impl AntigravityRemoteClient {
                 }
                 return Err(AntigravityUsageCommandError {
                     code: "ANTIGRAVITY_USAGE_UPSTREAM_ERROR".to_string(),
-                    message: format!("Network error: {}", e),
+                    message: format!("Network error: {}", error),
                     retryable: true,
                 });
             }
         };
-
         let status = res.status();
-        eprintln!("[antigravity_remote] <--- HTTP {} from {}", status, url);
+        eprintln!(
+            "[antigravity_remote] {} {} {}",
+            self.diagnostic_identity,
+            endpoint,
+            status.as_u16()
+        );
         let txt = res.text().await.unwrap_or_default();
-
         if status == reqwest::StatusCode::UNAUTHORIZED {
-            eprintln!("[antigravity_remote] <--- 401 Unauthorized");
             return Err(AntigravityUsageCommandError {
                 code: "ANTIGRAVITY_REAUTH_REQUIRED".to_string(),
                 message: "Unauthorized (401)".to_string(),
@@ -239,7 +257,6 @@ impl AntigravityRemoteClient {
             });
         }
         if status == reqwest::StatusCode::FORBIDDEN {
-            eprintln!("[antigravity_remote] <--- 403 Forbidden");
             return Err(AntigravityUsageCommandError {
                 code: "ANTIGRAVITY_USAGE_FORBIDDEN".to_string(),
                 message: "Forbidden (403)".to_string(),
@@ -247,7 +264,6 @@ impl AntigravityRemoteClient {
             });
         }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            eprintln!("[antigravity_remote] <--- 429 Rate Limited");
             return Err(AntigravityUsageCommandError {
                 code: "ANTIGRAVITY_USAGE_RATE_LIMITED".to_string(),
                 message: "Rate limited (429)".to_string(),
@@ -255,30 +271,22 @@ impl AntigravityRemoteClient {
             });
         }
         if !status.is_success() {
-            eprintln!("[antigravity_remote] <--- HTTP error");
             return Err(AntigravityUsageCommandError {
                 code: "ANTIGRAVITY_USAGE_UPSTREAM_ERROR".to_string(),
                 message: format!("Upstream HTTP status {}", status),
                 retryable: true,
             });
         }
-
-        match serde_json::from_str::<serde_json::Value>(&txt) {
-            Ok(json_val) => {
-                eprintln!(
-                    "[antigravity_remote] <--- SUCCESS Response JSON from {}",
-                    url
-                );
-                Ok(json_val)
+        serde_json::from_str::<serde_json::Value>(&txt).map_err(|error| {
+            eprintln!(
+                "[antigravity_remote] {} {} invalid_json",
+                self.diagnostic_identity, endpoint
+            );
+            AntigravityUsageCommandError {
+                code: "ANTIGRAVITY_USAGE_INVALID_RESPONSE".to_string(),
+                message: format!("Failed to parse JSON response: {}", error),
+                retryable: true,
             }
-            Err(e) => {
-                eprintln!("[antigravity_remote] <--- JSON parse error");
-                Err(AntigravityUsageCommandError {
-                    code: "ANTIGRAVITY_USAGE_INVALID_RESPONSE".to_string(),
-                    message: format!("Failed to parse JSON response: {}", e),
-                    retryable: true,
-                })
-            }
-        }
+        })
     }
 }

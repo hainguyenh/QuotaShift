@@ -66,18 +66,24 @@ export function mergeExactResult(
   );
   const hasWorkingCloud = Boolean(
     (previous?.cloudQuotas && previous.cloudQuotas.length > 0) ||
-      previous?.source === "cloud" ||
-      previous?.accuracy === "exact_grouped",
+    previous?.source === "cloud" ||
+    previous?.accuracy === "exact_grouped",
   );
 
   return {
     ...previous,
     loading: false,
-    exactState: hasWorkingCloud && isIdeNotFound ? (previous?.exactState || "idle") : result.state,
+    exactState: hasWorkingCloud && isIdeNotFound ? previous?.exactState || "idle" : result.state,
     source: hasExactCache ? "cached_exact" : previous?.source,
     fetchedAt: previous?.fetchedAt ?? now,
-    error: hasWorkingCloud && isIdeNotFound ? undefined : (result.error ?? "Exact Antigravity quota refresh failed"),
-    workerMessage: hasWorkingCloud && isIdeNotFound ? (previous?.workerMessage || "Cloud summary available") : previous?.workerMessage,
+    error:
+      hasWorkingCloud && isIdeNotFound
+        ? undefined
+        : (result.error ?? "Exact Antigravity quota refresh failed"),
+    workerMessage:
+      hasWorkingCloud && isIdeNotFound
+        ? previous?.workerMessage || "Cloud summary available"
+        : previous?.workerMessage,
   };
 }
 

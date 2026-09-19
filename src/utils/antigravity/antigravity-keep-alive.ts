@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { deobfuscate, obfuscate } from "../auth/auth";
+import { loadKeepAlivePreference } from "../common/app-constants";
 
 const ANTIGRAVITY_ACCOUNTS_KEY = "antigravity-accounts-list";
-const KEEP_ALIVE_KEY = "keepAliveActive";
 const DEFAULT_KEEP_ALIVE_INTERVAL_MINS = 240;
 const TOKEN_UPDATE_EVENT = "antigravity-keep-alive-tokens";
 
@@ -117,7 +117,7 @@ export async function initializeAntigravityKeepAliveBridge(): Promise<void> {
 
   await syncAntigravityKeepAliveAccounts();
 
-  const enabled = localStorage.getItem(KEEP_ALIVE_KEY) !== "false";
+  const enabled = loadKeepAlivePreference();
   if (enabled) {
     await invoke("start_keep_alive", { intervalMins: DEFAULT_KEEP_ALIVE_INTERVAL_MINS });
   } else {

@@ -2,8 +2,8 @@ use serde_json::{Map, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::types::ClaudeMonitorStatus;
-use super::{home_dir, quotashift_dir, write_atomic};
+use super::types::{ClaudeMonitorSource, ClaudeMonitorStatus};
+use super::{home_dir, quotashift_dir, read_snapshot, write_atomic};
 
 pub const BRIDGE_ARG: &str = "--claude-statusline-bridge";
 pub const PREVIOUS_STATUS_LINE_FILE: &str = "claude-statusline-previous.json";
@@ -26,7 +26,7 @@ pub fn install_bridge_in_value(
 ) -> Result<Option<Value>, String> {
     let root = settings
         .as_object_mut()
-        .ok_or_else(|| "Claude settings.json must contain a JSON object".to_string())?;
+        .ok_or_else(|| "Claude Code settings.json must contain a JSON object".to_string())?;
 
     let existing = root.get("statusLine").cloned();
     let previous = match existing.as_ref() {
@@ -37,7 +37,7 @@ pub fn install_bridge_in_value(
             .map(|_| Value::Object(object.clone())),
         Some(Value::Null) | None => None,
         Some(_) => return Err(
-            "Claude statusLine setting is not a command object; QuotaShift will not overwrite it"
+            "Claude Code statusLine setting is not a command object; QuotaShift will not overwrite it"
                 .to_string(),
         ),
     };
@@ -79,15 +79,16 @@ pub fn read_settings(path: &Path) -> Result<Value, String> {
         return Ok(Value::Object(Map::new()));
     }
     let raw = fs::read_to_string(path)
-        .map_err(|error| format!("Failed to read Claude settings.json: {error}"))?;
+        .map_err(|error| format!("Failed to read Claude Code settings.json: {error}"))?;
     serde_json::from_str(&raw).map_err(|error| {
-        format!("Claude settings.json is invalid JSON; QuotaShift left it unchanged: {error}")
+        format!("Claude Code settings.json is invalid JSON; QuotaShift left it unchanged: {error}")
     })
 }
 
 pub fn write_json(path: &Path, value: &Value) -> Result<(), String> {
-    let bytes = serde_json::to_vec_pretty(value)
-        .map_err(|error| format!("Failed to serialize local Claude integration data: {error}"))?;
+    let bytes = serde_json::to_vec_pretty(value).map_err(|error| {
+        format!("Failed to serialize local Claude Code integration data: {error}")
+    })?;
     write_atomic(path, &bytes)
 }
 
@@ -130,7 +131,19 @@ pub fn ensure_claude_statusline_bridge_impl() -> Result<ClaudeMonitorStatus, Str
     }
 
     write_json(&settings_path, &settings)?;
-    super::status::monitor_status(true, settings_path)
+    let session = read_snapshot().ok().flatten();
+    Ok(ClaudeMonitorStatus {
+        installed: true,
+        settings_path: Some(settings_path.to_string_lossy().to_string()),
+        source: if session.is_some() {
+            ClaudeMonitorSource::StatusLine
+        } else {
+            ClaudeMonitorSource::None
+        },
+        session,
+        local_usage: None,
+        error: None,
+    })
 }
 
 pub fn get_claude_monitor_status_impl() -> Result<ClaudeMonitorStatus, String> {

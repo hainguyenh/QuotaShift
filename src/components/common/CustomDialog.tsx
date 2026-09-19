@@ -7,7 +7,6 @@ interface CustomDialogProps {
   confirmText?: string;
   cancelText?: string;
   confirmVariant?: "primary" | "danger";
-  messageAlign?: "left" | "center";
   onClose: (confirmed: boolean) => void;
   onCancelClick?: () => void;
   confirmTooltip?: string;
@@ -21,7 +20,6 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
   confirmText = "OK",
   cancelText = "Cancel",
   confirmVariant = "primary",
-  messageAlign = "center",
   onClose,
   onCancelClick,
   confirmTooltip,
@@ -39,9 +37,7 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
     <div className="dialog-overlay" style={{ display: "flex" }} onClick={() => onClose(false)}>
       <div className="dialog-box" onClick={(e) => e.stopPropagation()}>
         {title && <div className="dialog-header">{title}</div>}
-        <p className={`dialog-message ${messageAlign === "left" ? "dialog-message--left" : ""}`}>
-          {message}
-        </p>
+        <p className="dialog-message">{message}</p>
         <div className="dialog-buttons">
           {isConfirm && (
             <button
@@ -50,7 +46,10 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
                 if (onCancelClick) onCancelClick();
                 else onClose(false);
               }}
-              data-tooltip={cancelTooltip || (cancelText === "Cancel" ? "Cancel the current action" : cancelText)}
+              data-tooltip={
+                cancelTooltip ||
+                (cancelText === "Cancel" ? "Cancel the current action" : cancelText)
+              }
             >
               {cancelText}
             </button>
@@ -58,7 +57,10 @@ export const CustomDialog: React.FC<CustomDialogProps> = ({
           <button
             className={`dialog-btn ${confirmVariant === "danger" ? "dialog-btn--danger" : ""}`}
             onClick={() => onClose(true)}
-            data-tooltip={confirmTooltip || (confirmVariant === "danger" ? "Delete and close dialog" : confirmText)}
+            data-tooltip={
+              confirmTooltip ||
+              (confirmVariant === "danger" ? "Delete and close dialog" : confirmText)
+            }
           >
             {confirmText}
           </button>

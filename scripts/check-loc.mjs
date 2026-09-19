@@ -85,7 +85,7 @@ export function scanDirectory(dir, rootDir = dir, acc = { files: [], testFilesSk
   }
 
   for (const entry of entries) {
-    if (IGNORED_DIRS.has(entry)) continue;
+    if (IGNORED_DIRS.has(entry) || entry.startsWith("target")) continue;
 
     const fullPath = resolve(dir, entry);
     let stat;
@@ -119,13 +119,11 @@ export function scanDirectory(dir, rootDir = dir, acc = { files: [], testFilesSk
   return acc;
 }
 
-/**
- * Verifies LOC for all tracked files or provided list.
- */
-export function verifyLoc(options = {}) {
+import prettier from "prettier";
+
+export function getTargetFiles(options = {}) {
   const root = options.rootDir || resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const limits = options.limits || DEFAULT_LIMITS;
-
   let targetFiles;
   let skippedTests = 0;
 
@@ -153,7 +151,14 @@ export function verifyLoc(options = {}) {
     targetFiles = scan.files;
     skippedTests = scan.testFilesSkipped;
   }
+  return { root, limits, targetFiles, skippedTests };
+}
 
+/**
+ * Verifies LOC for all tracked files synchronously.
+ */
+export function verifyLoc(options = {}) {
+  const { targetFiles, skippedTests } = getTargetFiles(options);
   const results = [];
   const violations = [];
 
@@ -189,7 +194,6 @@ export function verifyLoc(options = {}) {
     }
   }
 
-  // Sort violations by excess lines descending
   violations.sort((a, b) => b.excess - a.excess);
 
   return {
@@ -202,7 +206,68 @@ export function verifyLoc(options = {}) {
   };
 }
 
-function runCli() {
+/**
+ * Verifies LOC based on Prettier format, preventing minimized/compressed files from gaming the limits.
+ */
+export async function verifyLocAsync(options = {}) {
+  const { targetFiles, skippedTests } = getTargetFiles(options);
+  const results = [];
+  const violations = [];
+
+  for (const file of targetFiles) {
+    let content = "";
+    try {
+      content = readFileSync(file.fullPath, "utf8");
+    } catch (err) {
+      results.push({
+        ...file,
+        loc: 0,
+        error: String(err),
+        passed: false,
+      });
+      violations.push(results[results.length - 1]);
+      continue;
+    }
+
+    let formattedContent = content;
+    if (file.ext !== ".rs") {
+      try {
+        formattedContent = await prettier.format(content, { filepath: file.fullPath });
+      } catch {
+        formattedContent = content;
+      }
+    }
+
+    const loc = countFileLines(formattedContent);
+    const passed = loc <= file.limit;
+    const record = {
+      file: file.relPath,
+      ext: file.ext,
+      loc,
+      limit: file.limit,
+      excess: Math.max(0, loc - file.limit),
+      passed,
+    };
+
+    results.push(record);
+    if (!passed) {
+      violations.push(record);
+    }
+  }
+
+  violations.sort((a, b) => b.excess - a.excess);
+
+  return {
+    totalChecked: results.length,
+    totalPassed: results.length - violations.length,
+    testFilesSkipped: skippedTests,
+    violations,
+    passed: violations.length === 0,
+    results,
+  };
+}
+
+async function runCli() {
   const args = process.argv.slice(2);
   const warnOnly = args.includes("--warn");
   const jsonOutput = args.includes("--json");
@@ -210,7 +275,7 @@ function runCli() {
   const maxViolations = maxViolationsArg !== -1 ? parseInt(args[maxViolationsArg + 1], 10) : 0;
 
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  const result = verifyLoc({ rootDir: root });
+  const result = await verifyLocAsync({ rootDir: root });
 
   if (jsonOutput) {
     console.log(JSON.stringify(result, null, 2));

@@ -12,7 +12,6 @@ test('SettingsModal renders theme toggle button to the left of close button in h
   assert.match(settingsModalCode, /className="settings-modal-close"/);
   assert.match(settingsModalCode, /<ThemeIcon\s+isDarkMode=\{isDarkMode\}\s*\/>/);
 
-  // Assert theme toggle appears before close button in DOM order
   const themeToggleIdx = settingsModalCode.indexOf('settings-modal-theme-toggle');
   const closeIdx = settingsModalCode.indexOf('settings-modal-close');
   assert.ok(themeToggleIdx > 0 && closeIdx > 0, 'Both buttons must exist');
@@ -39,10 +38,13 @@ test('settings-modal.css defines clean light mode segmented switch track and whi
   assert.doesNotMatch(settingsModalCss, /\[data-theme="light"\]\s+\.settings-segment-btn--active\s*\{[^}]*background:\s*#18181b;/);
 });
 
-test('SettingsModal renders Export Backup and Import Backup side by side in settings-backup-row', () => {
-  assert.match(settingsModalCode, /<div className="settings-backup-row">[\s\S]*?Export Backup[\s\S]*?Import Backup[\s\S]*?<\/div>/);
-  assert.match(settingsModalCss, /\.settings-backup-row\s*\{[^}]*display:\s*flex;/);
-  assert.match(settingsModalCss, /\.settings-backup-row\s+\.settings-action-row\s*\{[^}]*flex:\s*1;/);
-  assert.match(settingsModalCss, /\.settings-backup-row\s+\.settings-action-row:last-child[\s\S]*?justify-content:\s*flex-end;/);
+test('Settings Data tab renders each action as its own full-width row without a divider or backup group', () => {
+  const dataBlock = settingsModalCode.match(/activeTab === "data"[\s\S]*?activeTab === "ui"/)?.[0] ?? '';
+  assert.match(dataBlock, /Rescan all Codex models/);
+  assert.match(dataBlock, /Export Backup/);
+  assert.match(dataBlock, /Import Backup/);
+  assert.doesNotMatch(dataBlock, /settings-backup-row/);
+  assert.doesNotMatch(dataBlock, /settings-divider/);
+  assert.match(settingsModalCss, /\.settings-action-row\s*\{[^}]*width:\s*100%;/);
 });
 

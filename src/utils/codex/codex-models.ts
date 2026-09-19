@@ -7,6 +7,8 @@ import type {
   CodexTierModelGroup,
 } from "../common/types.js";
 
+export type { CodexTierModelGroup };
+
 export const CODEX_MODEL_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function readCatalogRows(raw: unknown): unknown[] {

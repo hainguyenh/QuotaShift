@@ -1,58 +1,93 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import appPackage from "../../../package.json";
 import { ThemeIcon } from "./HeaderIcons";
 import { ShortcutSettings } from "./ShortcutSettings";
+import { PollWarning } from "./PollWarning";
+import { IdlePollField } from "./IdlePollField";
+import { BehaviorSettingsSection } from "./BehaviorSettingsSection";
+import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
+import {
+  SettingsGearIcon,
+  SettingsCloseIcon,
+  TrackedPollIcon,
+  DataRescanIcon,
+  ExportBackupIcon,
+  ImportBackupIcon,
+} from "./SettingsIcons";
+import { OverlayAdjustmentGroup } from "./OverlayAdjustmentGroup";
+import { OverlayPrimaryRow } from "./OverlayPrimaryRow";
+import { type SettingsTab, type SettingsModalProps } from "./settings-types";
+import { useSettingsPollState } from "./useSettingsPollState";
+import { useSettingsModalTab } from "./useSettingsModalTab";
+import {
+  UI_ADJUSTMENT_DEFAULTS,
+  normalizeUiAdjustmentPreferences,
+  type UiAdjustmentPreferences,
+} from "../../utils/common/ui-adjustment";
 
 const POLL_MIN = 5;
 const POLL_MAX = 1200;
-// Recommended ranges (in seconds). These are advisory only.
-const TRACKED_MIN = 30;
-const TRACKED_MAX = 120;
-const IDLE_MIN = 300; // 5 min
-const IDLE_MAX = 900; // 15 min
 const CHANGELOG_URL = "https://github.com/the-long-ride/QuotaShift/blob/main/CHANGELOG.md";
 
-interface SettingsModalProps {
-  isOpen: boolean; onClose: () => void; isDarkMode?: boolean; onToggleTheme?: () => void;
-  trackedPollInterval: number; onTrackedPollIntervalChange: (val: number) => void;
-  idlePollInterval: number; onIdlePollIntervalChange: (val: number) => void;
-  keepAliveActive: boolean; onToggleKeepAlive: () => void;
-  persistentWorkersEnabled: boolean; onTogglePersistentWorkers: () => void;
-  overlayEnabled?: boolean; onToggleOverlay?: () => void;
-  codexModelScanProgress: { running: boolean; total: number; completed: number; succeeded: number; failed: number };
-  onRescanAllCodexModels: () => void; onExportBackup: () => void; onImportBackup: () => void;
-  cardLayoutMode?: "compact" | "expanded"; onCardLayoutModeChange?: (mode: "compact" | "expanded") => void;
-}
-
-const idleSecsToMinSec = (s: number) => ({ minutes: Math.floor(s / 60), seconds: s % 60 });
-const minSecToSecs = (m: number, s: number) => m * 60 + s;
-const clampPoll = (value: number) => Math.max(POLL_MIN, Math.min(POLL_MAX, Math.round(value)));
-type WarningLevel = "low" | "high" | null;
-const getTrackedWarning = (val: number): WarningLevel => (val < TRACKED_MIN ? "low" : val > TRACKED_MAX ? "high" : null);
-const getIdleWarning = (totalSecs: number): WarningLevel => (totalSecs < IDLE_MIN ? "low" : totalSecs > IDLE_MAX ? "high" : null);
+const SETTINGS_TABS: Array<[SettingsTab, string]> = [
+  ["poll", "Monitoring"],
+  ["appearance", "Appearance"],
+  ["shortcuts", "Keyboard Shortcuts"],
+  ["data", "Data"],
+  ["ui", "Overlay"],
+];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen, onClose, isDarkMode = false, onToggleTheme, trackedPollInterval,
-  onTrackedPollIntervalChange, idlePollInterval, onIdlePollIntervalChange, keepAliveActive,
-  onToggleKeepAlive, persistentWorkersEnabled, onTogglePersistentWorkers, overlayEnabled = true,
-  onToggleOverlay, codexModelScanProgress, onRescanAllCodexModels, onExportBackup, onImportBackup,
-  cardLayoutMode = "expanded", onCardLayoutModeChange,
+  isOpen,
+  onClose,
+  isDarkMode = false,
+  onToggleTheme,
+  trackedPollInterval,
+  onTrackedPollIntervalChange,
+  idlePollInterval,
+  onIdlePollIntervalChange,
+  keepAliveActive,
+  onToggleKeepAlive,
+  persistentWorkersEnabled,
+  onTogglePersistentWorkers,
+  overlayEnabled = true,
+  onToggleOverlay,
+  codexModelScanProgress,
+  onRescanAllCodexModels,
+  onExportBackup,
+  onImportBackup,
+  cardLayoutMode = "expanded",
+  onCardLayoutModeChange,
+  platformVisibility,
+  onPlatformVisibilityChange,
+  uiAdjustment,
+  onUiAdjustmentChange,
 }) => {
-  const [trackedVal, setTrackedVal] = useState(trackedPollInterval);
-  const { minutes: initMins, seconds: initSecs } = idleSecsToMinSec(idlePollInterval);
-  const [idleMinutes, setIdleMinutes] = useState(initMins);
-  const [idleSeconds, setIdleSeconds] = useState(initSecs);
+  const [activeTab, setActiveTab] = useState<SettingsTab>("poll");
+  const tabRefs = useSettingsModalTab(activeTab, isOpen, onClose);
 
-  useEffect(() => { setTrackedVal(trackedPollInterval); }, [trackedPollInterval]);
-  useEffect(() => {
-    const { minutes, seconds } = idleSecsToMinSec(idlePollInterval);
-    setIdleMinutes(minutes); setIdleSeconds(seconds);
-  }, [idlePollInterval]);
+  const {
+    trackedVal,
+    setTrackedVal,
+    idleMinutes,
+    idleSeconds,
+    trackedWarn,
+    idleWarn,
+    commitTracked,
+    commitIdle,
+    handleIdleMinutesChange,
+    handleIdleSecondsChange,
+  } = useSettingsPollState(
+    trackedPollInterval,
+    onTrackedPollIntervalChange,
+    idlePollInterval,
+    onIdlePollIntervalChange,
+    POLL_MIN,
+    POLL_MAX,
+  );
 
   if (!isOpen) return null;
-  const idleTotalSecs = minSecToSecs(idleMinutes, idleSeconds);
-  const trackedWarn = getTrackedWarning(trackedVal), idleWarn = getIdleWarning(idleTotalSecs);
 
   const handleTrackedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = parseInt(e.target.value, 10);
@@ -60,242 +95,213 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setTrackedVal(val);
     if (val >= POLL_MIN) onTrackedPollIntervalChange(val);
   };
-  const commitTracked = () => {
-    const val = clampPoll(trackedVal);
-    setTrackedVal(val);
-    onTrackedPollIntervalChange(val);
-  };
-  const applyIdleTotal = (total: number) => {
-    const bounded = Math.max(0, Math.min(POLL_MAX, total));
-    const { minutes, seconds } = idleSecsToMinSec(bounded);
-    setIdleMinutes(minutes);
-    setIdleSeconds(seconds);
-    if (bounded >= POLL_MIN) onIdlePollIntervalChange(bounded);
-  };
-  const commitIdle = () => {
-    const total = clampPoll(minSecToSecs(idleMinutes, idleSeconds));
-    const { minutes, seconds } = idleSecsToMinSec(total);
-    setIdleMinutes(minutes);
-    setIdleSeconds(seconds);
-    onIdlePollIntervalChange(total);
-  };
-  const handleIdleMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseInt(e.target.value, 10);
-    const mins = isNaN(v) ? 0 : Math.max(0, Math.min(POLL_MAX / 60, v));
-    applyIdleTotal(minSecToSecs(mins, idleSeconds));
-  };
-  const handleIdleSecondsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseInt(e.target.value, 10);
-    const secs = isNaN(v) ? 0 : Math.max(0, Math.min(59, v));
-    applyIdleTotal(minSecToSecs(idleMinutes, secs));
-  };
-  const handleOverlayClick = () => { onToggleOverlay?.(); };
+
+  const updateUi = (patch: Partial<UiAdjustmentPreferences>) =>
+    onUiAdjustmentChange(normalizeUiAdjustmentPreferences({ ...uiAdjustment, ...patch }));
+  const resetOverlay = () =>
+    updateUi({
+      overlayScale: UI_ADJUSTMENT_DEFAULTS.overlayScale,
+      overlayTheme: UI_ADJUSTMENT_DEFAULTS.overlayTheme,
+    });
 
   return (
-    <div className="dialog-overlay settings-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dialog-box settings-modal-box">
+    <div
+      className="dialog-overlay settings-modal-overlay"
+      data-no-window-drag
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="dialog-box settings-modal-box" style={{ width: "552px" }}>
         <div className="settings-modal-header">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <SettingsGearIcon />
           <span>Settings</span>
           <div className="settings-modal-header-actions">
-            <button type="button" className="settings-modal-version-link" onClick={() => void openUrl(CHANGELOG_URL)} title="View changelog">v{appPackage.version}</button>
+            <button
+              type="button"
+              className="settings-modal-version-link"
+              onClick={() => void openUrl(CHANGELOG_URL)}
+              title="View changelog"
+            >
+              v{appPackage.version}
+            </button>
             {onToggleTheme && (
-              <button type="button" className="settings-modal-theme-toggle" onClick={onToggleTheme} aria-label="Toggle theme" title="Toggle light/dark mode">
+              <button
+                type="button"
+                className="settings-modal-theme-toggle"
+                onClick={onToggleTheme}
+                aria-label="Toggle theme"
+                title="Toggle light/dark mode"
+              >
                 <ThemeIcon isDarkMode={isDarkMode} />
               </button>
             )}
-            <button type="button" className="settings-modal-close" onClick={onClose} aria-label="Close settings">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+            <button
+              type="button"
+              className="settings-modal-close"
+              onClick={onClose}
+              aria-label="Close settings"
+            >
+              <SettingsCloseIcon />
             </button>
           </div>
         </div>
 
-        <div className="settings-modal-content">
-          <div className="settings-section">
-            <div className="settings-section-title">Poll Rate</div>
-
-            <div className="settings-field">
-              <div className="settings-field-label-row">
-                <label className="settings-field-label" htmlFor="tracked-poll-rate">Tracked Account Poll Rate</label>
-                <span className="settings-field-hint">Recommended: 30–120 sec</span>
-              </div>
-              <div className="settings-input-row">
-                <input
-                  type="number"
-                  id="tracked-poll-rate"
-                  className={`settings-number-input ${trackedWarn ? "settings-number-input--warn" : ""}`}
-                  min={POLL_MIN}
-                  max={POLL_MAX}
-                  value={trackedVal}
-                  onChange={handleTrackedChange}
-                  onBlur={commitTracked}
-                />
-                <span className="settings-unit">sec</span>
-              </div>
-              {trackedWarn === "low" && (
-                <div className="settings-warning settings-warning--low">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Value below the recommendation — frequent polling may harm performance and API rate limits.
-                </div>
-              )}
-              {trackedWarn === "high" && (
-                <div className="settings-warning settings-warning--high">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Value above the recommendation — quota changes may take longer to be detected.
-                </div>
-              )}
-            </div>
-
-            <div className="settings-field">
-              <div className="settings-field-label-row">
-                <label className="settings-field-label">Other Idle Accounts Poll Rate</label>
-                <span className="settings-field-hint">Recommended: 5–15 min</span>
-              </div>
-              <div className="settings-input-row">
-                <input
-                  type="number"
-                  id="idle-poll-minutes"
-                  className={`settings-number-input settings-number-input--wide ${idleWarn ? "settings-number-input--warn" : ""}`}
-                  min={0}
-                  max={POLL_MAX / 60}
-                  value={idleMinutes}
-                  onChange={handleIdleMinutesChange}
-                  onBlur={commitIdle}
-                  aria-label="Idle poll rate minutes"
-                />
-                <span className="settings-unit">min</span>
-                <input
-                  type="number"
-                  id="idle-poll-seconds"
-                  className={`settings-number-input settings-number-input--wide ${idleWarn ? "settings-number-input--warn" : ""}`}
-                  min={0}
-                  max={59}
-                  value={idleSeconds}
-                  onChange={handleIdleSecondsChange}
-                  onBlur={commitIdle}
-                  aria-label="Idle poll rate seconds"
-                />
-                <span className="settings-unit">sec</span>
-              </div>
-              {idleWarn === "low" && (
-                <div className="settings-warning settings-warning--low">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Value below the recommendation — frequent idle polling may harm performance.
-                </div>
-              )}
-              {idleWarn === "high" && (
-                <div className="settings-warning settings-warning--high">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Value above the recommendation — idle-account changes may take longer to be detected.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="settings-divider" />
-
-          <div className="settings-section">
-            <div className="settings-section-title">Behavior</div>
-
-            <button className="settings-toggle-row" onClick={onToggleKeepAlive}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
-                <polyline points="12 7 12 12 15 15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="settings-toggle-label">Keep-Alive</span>
-              <span className={`codex-pool-switch ${keepAliveActive ? "codex-pool-switch--on" : ""}`} role="switch" aria-checked={keepAliveActive} aria-label="Keep-Alive">
-                <span className="codex-pool-switch-thumb" />
-              </span>
-            </button>
-
-            {onToggleOverlay && (
-              <button className="settings-toggle-row" onClick={handleOverlayClick} title="Toggle on-screen floating desktop overlay widget">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <rect x="2" y="2" width="20" height="20" rx="3" stroke="currentColor" strokeWidth="1.8"/>
-                  <rect x="6" y="6" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                  <rect x="13" y="6" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                  <rect x="6" y="13" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                </svg>
-                <span className="settings-toggle-label">Desktop Overlay</span>
-                <span className={`codex-pool-switch ${overlayEnabled ? "codex-pool-switch--on" : ""}`} role="switch" aria-checked={overlayEnabled} aria-label="Desktop Overlay">
-                  <span className="codex-pool-switch-thumb" />
-                </span>
+        <div className="settings-modal-body">
+          <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+            {SETTINGS_TABS.map(([id, label]) => (
+              <button
+                key={id}
+                ref={(node) => {
+                  if (node) tabRefs.current[id] = node;
+                }}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === id}
+                className={`settings-tab ${activeTab === id ? "settings-tab--active" : ""}`}
+                onClick={() => setActiveTab(id)}
+              >
+                {label}
               </button>
+            ))}
+          </div>
+          <div className="settings-modal-content">
+            {activeTab === "poll" && (
+              <div className="settings-section">
+                <div className="settings-section-title">Monitoring</div>
+                <div className="settings-field">
+                  <div className="settings-toggle-row settings-toggle-row--segmented">
+                    <span className="settings-row-icon">
+                      <TrackedPollIcon />
+                    </span>
+                    <span className="settings-toggle-copy">
+                      <label className="settings-toggle-label" htmlFor="tracked-poll-rate">
+                        Monitored account poll rate
+                      </label>
+                      <span className="settings-toggle-description">Recommended: 30–120 sec</span>
+                    </span>
+                    <div className="settings-input-row">
+                      <input
+                        type="number"
+                        id="tracked-poll-rate"
+                        className={`settings-number-input ${trackedWarn ? "settings-number-input--warn" : ""}`}
+                        min={POLL_MIN}
+                        max={POLL_MAX}
+                        value={trackedVal}
+                        onChange={handleTrackedChange}
+                        onBlur={commitTracked}
+                      />
+                      <span className="settings-unit">sec</span>
+                    </div>
+                  </div>
+                  <PollWarning warning={trackedWarn} type="tracked" />
+                </div>
+                <IdlePollField
+                  idleMinutes={idleMinutes}
+                  idleSeconds={idleSeconds}
+                  idleWarn={idleWarn}
+                  maxMinutes={POLL_MAX / 60}
+                  onMinutesChange={handleIdleMinutesChange}
+                  onSecondsChange={handleIdleSecondsChange}
+                  onCommit={commitIdle}
+                />
+                <BehaviorSettingsSection
+                  keepAliveActive={keepAliveActive}
+                  onToggleKeepAlive={onToggleKeepAlive}
+                  persistentWorkersEnabled={persistentWorkersEnabled}
+                  onTogglePersistentWorkers={onTogglePersistentWorkers}
+                />
+              </div>
             )}
-
-            <button className="settings-toggle-row" onClick={onTogglePersistentWorkers} title="Experimental: keep isolated Antigravity quota workers running">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" strokeWidth="1.8"/>
-                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-              <span className="settings-toggle-label">Persistent AG Monitor <strong style={{ fontSize: "8px" }}>Experimental</strong></span>
-              <span className={`codex-pool-switch ${persistentWorkersEnabled ? "codex-pool-switch--on" : ""}`} role="switch" aria-checked={persistentWorkersEnabled} aria-label="Persistent AG Monitor">
-                <span className="codex-pool-switch-thumb" />
-              </span>
-            </button>
-
-            <div className="settings-toggle-row settings-toggle-row--segmented">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-                <rect x="3" y="14" width="18" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.8"/>
-              </svg>
-              <span className="settings-toggle-label">Card View</span>
-              <div className="settings-segmented-switch" role="group" aria-label="Card View Mode">
-                <button type="button" className={`settings-segment-btn ${cardLayoutMode === "compact" ? "settings-segment-btn--active" : ""}`} onClick={() => onCardLayoutModeChange?.("compact")}>Compact</button>
-                <button type="button" className={`settings-segment-btn ${cardLayoutMode === "expanded" ? "settings-segment-btn--active" : ""}`} onClick={() => onCardLayoutModeChange?.("expanded")}>Expand</button>
+            {activeTab === "appearance" && (
+              <AppearanceSettingsSection
+                cardLayoutMode={cardLayoutMode}
+                onCardLayoutModeChange={onCardLayoutModeChange}
+                platformVisibility={platformVisibility}
+                onPlatformVisibilityChange={onPlatformVisibilityChange}
+              />
+            )}
+            {activeTab === "shortcuts" && <ShortcutSettings />}
+            {activeTab === "data" && (
+              <div className="settings-section">
+                <div className="settings-section-title">Data</div>
+                <button
+                  type="button"
+                  className="settings-action-row settings-toggle-row"
+                  disabled={codexModelScanProgress.running}
+                  onClick={onRescanAllCodexModels}
+                  aria-label="Rescan all Codex models"
+                >
+                  <span
+                    className={
+                      codexModelScanProgress.running ? "codex-spinner" : "settings-row-icon"
+                    }
+                  >
+                    {codexModelScanProgress.running ? null : <DataRescanIcon />}
+                  </span>
+                  <span className="settings-toggle-copy">
+                    <span className="settings-toggle-label">
+                      {codexModelScanProgress.running
+                        ? `Scanning ${codexModelScanProgress.completed} / ${codexModelScanProgress.total}`
+                        : "Rescan all Codex models"}
+                    </span>
+                    <span className="settings-toggle-description">
+                      Scan and cache available models and capabilities for all accounts.
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="settings-action-row settings-toggle-row"
+                  onClick={onExportBackup}
+                  aria-label="Export Backup"
+                >
+                  <span className="settings-row-icon">
+                    <ExportBackupIcon />
+                  </span>
+                  <span className="settings-toggle-copy">
+                    <span className="settings-toggle-label">Export backup</span>
+                    <span className="settings-toggle-description">
+                      Export accounts, configuration, and preferences to a JSON file.
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="settings-action-row settings-toggle-row"
+                  onClick={onImportBackup}
+                  aria-label="Import Backup"
+                >
+                  <span className="settings-row-icon">
+                    <ImportBackupIcon />
+                  </span>
+                  <span className="settings-toggle-copy">
+                    <span className="settings-toggle-label">Import backup</span>
+                    <span className="settings-toggle-description">
+                      Restore accounts and settings from an existing backup file.
+                    </span>
+                  </span>
+                </button>
               </div>
-            </div>
-          </div>
-
-          <div className="settings-divider" />
-          <ShortcutSettings />
-          <div className="settings-divider" />
-
-          <div className="settings-section">
-            <div className="settings-section-title">Data</div>
-
-            <button className="settings-action-row" disabled={codexModelScanProgress.running} onClick={() => onRescanAllCodexModels()} aria-label="Rescan all Codex models">
-              {codexModelScanProgress.running ? (
-                <span className="codex-spinner" style={{ width: "11px", height: "11px", borderWidth: "1.5px", flexShrink: 0 }} aria-hidden="true" />
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="12" height="12" aria-hidden="true">
-                  <path d="M20 10L20 9C20 8.07003 20 7.60504 19.8978 7.22354C19.6204 6.18827 18.8117 5.37962 17.7765 5.10222C17.395 5 16.93 5 16 5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M20 14L20 15C20 15.93 20 16.395 19.8978 16.7765C19.6204 17.8117 18.8117 18.6204 17.7765 18.8978C17.395 19 16.93 19 16 19" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M10 19L9 19C7.13077 19 6.19615 19 5.5 18.5981C5.04394 18.3348 4.66523 17.9561 4.40192 17.5C4 16.8038 4 15.8692 4 14" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M10 5L9 5C7.13077 5 6.19615 5 5.5 5.40192C5.04394 5.66523 4.66523 6.04394 4.40192 6.5C4 7.19615 4 8.13077 4 10" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M10 21L10 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-              <span>{codexModelScanProgress.running ? `Scanning ${codexModelScanProgress.completed} / ${codexModelScanProgress.total}` : "Rescan all Codex models"}</span>
-            </button>
-
-            <div className="settings-divider" />
-
-            <div className="settings-backup-row">
-              <button className="settings-action-row" onClick={onExportBackup}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Export Backup</span>
-              </button>
-
-              <button className="settings-action-row settings-action-row--right" onClick={onImportBackup}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <polyline points="7 10 12 5 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <line x1="12" y1="5" x2="12" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Import Backup</span>
-              </button>
-            </div>
+            )}
+            {activeTab === "ui" && (
+              <div className="settings-section settings-ui-section">
+                <div className="settings-section-title">Overlay</div>
+                <OverlayPrimaryRow
+                  overlayEnabled={overlayEnabled}
+                  onToggleOverlay={onToggleOverlay}
+                  onReset={resetOverlay}
+                />
+                {/* Overlay UI Scale */}
+                <OverlayAdjustmentGroup
+                  scale={uiAdjustment.overlayScale}
+                  theme={uiAdjustment.overlayTheme}
+                  onChange={(val) => updateUi({ overlayScale: val })}
+                  onThemeChange={(overlayTheme) => updateUi({ overlayTheme })}
+                  label="Overlay UI scale"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

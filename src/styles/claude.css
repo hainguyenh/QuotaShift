@@ -119,12 +119,16 @@
 .claude-usage-grid,
 .claude-local-usage-grid,
 .claude-stat-grid {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 8px;
 }
 
-.claude-usage-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.claude-usage-card {
+  width: fit-content;
+  min-width: 210px;
+  max-width: 100%;
 }
 
 .claude-usage-card {
@@ -170,10 +174,13 @@
 }
 
 .claude-local-usage-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .claude-local-usage-card {
+  width: fit-content;
+  min-width: 220px;
+  max-width: 100%;
   border: 1px solid var(--border-color);
   background: var(--card-bg);
   border-radius: 8px;
@@ -214,11 +221,16 @@
   margin-top: 4px;
 }
 
-.claude-stat-grid {
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+.claude-context-card {
+  width: fit-content;
+  min-width: min(360px, 100%);
+  max-width: 100%;
 }
 
 .claude-stat {
+  width: fit-content;
+  min-width: 110px;
+  max-width: 100%;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -324,6 +336,127 @@
   color: var(--text-secondary);
 }
 
+.claude-guardrail-primary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.claude-auto-resume-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--text-primary) 4%);
+}
+
+.claude-auto-resume-group > .codex-pool-switch {
+  flex: 0 0 auto;
+}
+
+.claude-auto-resume-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.claude-auto-resume-copy strong {
+  font-size: 8.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: color 0.15s ease;
+}
+
+.claude-auto-resume-copy strong.claude-control-label--active,
+.claude-auto-resume-group--active .claude-auto-resume-copy strong {
+  color: var(--text-primary);
+}
+
+.claude-auto-resume-copy small {
+  font-size: 7.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.claude-poll-control--inline {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  padding: 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card-bg) 96%, var(--text-primary) 4%);
+}
+
+.claude-poll-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.claude-poll-copy .claude-control-label {
+  font-size: 8.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.claude-poll-copy .claude-control-label.claude-control-label--active {
+  color: var(--text-primary);
+}
+
+.claude-poll-control--inline .claude-control-note {
+  white-space: nowrap;
+  font-size: 7.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.claude-poll-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.claude-poll-control--inline .claude-control-input {
+  width: 7ch;
+  min-width: 7ch;
+  max-width: 7ch;
+  height: 22px;
+  padding: 0 4px;
+  text-align: center;
+  font-size: 9.5px;
+  border-radius: 4px;
+  background: var(--bg-color);
+  color: var(--text-primary);
+}
+
+.claude-poll-control--inline .claude-control-input:focus {
+  border-color: var(--border-hover);
+}
+
+.claude-poll-input-wrap .claude-control-unit {
+  font-size: 8.5px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
 .claude-controls-chevron {
   width: 12px;
   height: 12px;
@@ -343,15 +476,23 @@
   gap: 4px;
 }
 
-.claude-poll-control {
-  margin-bottom: 9px;
+.claude-control-field.claude-poll-control--inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
 }
 
 .claude-control-label,
 .claude-threshold-heading > span {
   font-size: 8.5px;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.claude-threshold-heading > span.claude-control-label--active {
+  color: var(--text-primary);
 }
 
 .claude-threshold-grid {

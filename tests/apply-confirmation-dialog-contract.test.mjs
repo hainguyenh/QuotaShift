@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { readWithCssImports } from './css-helper.mjs';
 import { buildCodexAuthContent } from '../.test-build/codex/current-local-session.js';
 
-const app = fs.readFileSync('src/App.tsx', 'utf8');
+const app = readWithCssImports('src/App.tsx');
 const lib = fs.readFileSync('src-tauri/src/lib.rs', 'utf8');
 const commands = fs.readFileSync('src-tauri/src/app/commands.rs', 'utf8');
 const processRs = fs.readFileSync('src-tauri/src/codex/process.rs', 'utf8');

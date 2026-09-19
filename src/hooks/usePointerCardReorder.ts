@@ -28,6 +28,8 @@ export function usePointerCardReorder<T extends { id: string }>(
           id: element.dataset.sortableAccountId || "",
           top: rect.top,
           bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
         };
       })
       .filter((rect) => Boolean(rect.id));
@@ -63,6 +65,7 @@ export function usePointerCardReorder<T extends { id: string }>(
     const initialRects = collectCardRects();
     const srcRect = initialRects.find((r) => r.id === id);
     const grabOffsetY = srcRect ? event.clientY - srcRect.top : undefined;
+    const grabOffsetX = srcRect?.left !== undefined ? event.clientX - srcRect.left : undefined;
 
     controllerRef.current.begin(
       id,
@@ -72,6 +75,7 @@ export function usePointerCardReorder<T extends { id: string }>(
       items.map((item) => item.id),
       initialRects,
       grabOffsetY,
+      grabOffsetX,
     );
 
     const onPointerMove = (e: PointerEvent) => {

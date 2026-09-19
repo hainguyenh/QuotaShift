@@ -1,11 +1,16 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { readWithCssImports } from "./css-helper.mjs";
 
-const app = fs.readFileSync('src/App.tsx', 'utf8');
-const tab = fs.readFileSync('src/components/codex/CodexTab.tsx', 'utf8');
+const app = readWithCssImports("src/App.tsx");
+const tab =
+  fs.readFileSync("src/components/codex/CodexTab.tsx", "utf8") +
+  (fs.existsSync("src/components/codex/CodexAccountCard.tsx")
+    ? fs.readFileSync("src/components/codex/CodexAccountCard.tsx", "utf8")
+    : "");
 
-test('App persists and wires Codex model pools', () => {
+test("App persists and wires Codex model pools", () => {
   assert.match(app, /quotashift_codex_account_pools_v1/);
   assert.match(app, /CodexPoolModal/);
   assert.match(app, /handleSaveCodexPool/);
@@ -16,7 +21,7 @@ test('App persists and wires Codex model pools', () => {
   assert.match(app, /onApplyPool=\{handleApplyBestCodexPool\}/);
 });
 
-test('pool Apply writes a model override while direct account Apply remains model-null capable', () => {
+test("pool Apply writes a model override while direct account Apply remains model-null capable", () => {
   assert.match(app, /handleApplyCodexAccount\s*=\s*async\s*\([\s\S]{0,300}modelOverride/);
   assert.match(app, /const\s+model\s*=\s*modelOverride\?\.trim\(\)\s*\|\|\s*null/);
   assert.match(app, /sync_codex_provider_config[\s\S]{0,250}model/);
@@ -25,13 +30,13 @@ test('pool Apply writes a model override while direct account Apply remains mode
   assert.match(tab, /onApply\(acc\)/);
 });
 
-test('deleting a Codex account reconciles pool membership without deleting the pool', () => {
+test("deleting a Codex account reconciles pool membership without deleting the pool", () => {
   assert.match(app, /reconcileCodexPools\(codexPoolsRef\.current,\s*list\)/);
   assert.match(app, /saveCodexPools/);
 });
 
-test('backup export and import round-trip optional Codex pools', () => {
-  const backup = fs.readFileSync('src/utils/common/app-backup.ts', 'utf8');
+test("backup export and import round-trip optional Codex pools", () => {
+  const backup = fs.readFileSync("src/utils/common/app-backup.ts", "utf8");
   assert.match(app, /codex:\s*\{[\s\S]{0,250}pools:\s*loadCodexPools\(\)/);
   assert.match(backup, /Array\.isArray\(pData\.pools\)/);
   assert.match(backup, /importedIdMap/);
@@ -40,12 +45,15 @@ test('backup export and import round-trip optional Codex pools', () => {
   assert.doesNotMatch(backup, /version:\s*3/);
 });
 
-test('active auto-switch pools fail over after refresh and preserve the pool model', () => {
+test("active auto-switch pools fail over after refresh and preserve the pool model", () => {
   assert.match(app, /maybeAutoFailoverActiveCodexPool/);
   assert.match(app, /findCodexPoolFailover/);
   assert.match(app, /codexFailoverLatchRef/);
   assert.match(app, /await\s+maybeAutoFailoverActiveCodexPool\(\)/);
-  assert.match(app, /Promise\.all\(accounts\.map\(\(acc\)\s*=>\s*fetchAccountUsage\(acc\)\)\)[\s\S]{0,250}maybeAutoFailoverActiveCodexPool/);
+  assert.match(
+    app,
+    /Promise\.all\(loadCodexAccounts\(\)\.map\(\(acc\)\s*=>\s*fetchAccountUsage\(acc\)\)\)[\s\S]{0,250}maybeAutoFailoverActiveCodexPool/,
+  );
   assert.match(app, /activeCodexPoolIdRef/);
   assert.match(app, /activePool[\s\S]{0,300}model/);
 });
