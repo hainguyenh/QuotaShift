@@ -1,10 +1,10 @@
 {
   "name": "quotashift",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.1.0",
   "author": "the-long-ride",
   "type": "module",
-  "packageManager": "pnpm@12.3.4",
+  "packageManager": "pnpm@12.4.2",
   "scripts": {
     "dev": "vite",
     "test": "node scripts/test.mjs",
@@ -27,6 +27,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-global-shortcut": "^2.3.2",
+    "@tauri-apps/plugin-notification": "^2.4.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-store": "^2.4.3",
     "react": "^19.2.8",
