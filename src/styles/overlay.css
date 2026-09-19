@@ -1,27 +1,21 @@
 /* ─── Liquid Glass Floating Overlay ──────────────────────────────────────── */
 .overlay-container {
-  width: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   background: transparent;
-  padding: 6px 4px 0 4px;
   box-sizing: border-box;
   position: relative;
 }
 
 /* ── Base card ── */
 .glass-card {
-  width: 100%;
-  height: auto;
-  min-height: 52px;
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.14) 0%,
-    rgba(38, 46, 64, 0.65) 45%,
-    rgba(22, 28, 42, 0.78) 100%
+    rgba(57, 68, 94, 0.65) 45%,
+    rgba(35, 44, 63, 0.78) 100%
   );
   background-clip: padding-box;
   backdrop-filter: blur(16px) saturate(190%);
@@ -36,62 +30,49 @@
   align-items: center;
   padding: 0 10px;
   gap: 8px;
+  box-sizing: border-box;
+  max-height: 100%;
   user-select: none;
   cursor: grab;
-}
-
-/* Wide card for multi-family horizontal layout */
-.glass-card--wide {
-  align-items: center;
-  padding: 6px 10px;
-}
-
-/* Platform-specific overlay sizing: Codex and Claude are 70% width of Antigravity (single usage pool) */
-.glass-card--codex,
-.glass-card--claude,
-[data-provider="codex"] .glass-card,
-[data-provider="claude"] .glass-card {
-  width: 100%;
-  max-width: 238px;
-}
-
-.glass-card--antigravity,
-[data-provider="antigravity"] .glass-card {
-  width: 100%;
-  max-width: 340px;
 }
 
 .glass-card:hover {
   border-top-color: rgba(255, 255, 255, 0.75);
 }
 
-.glass-card:active { cursor: grabbing; }
+.glass-card:active {
+  cursor: grabbing;
+}
 
-/* Liquid glossy specular reflection on upper half */
+.glass-card--codex,
+.glass-card--claude {
+  padding: 6px 16px;
+  gap: 8px;
+}
+
+/* Specular reflection on upper half */
 .glass-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 50%;
-  border-radius: 11px 11px 80% 80% / 11px 11px 14px 14px;
+  height: 38%;
+  border-radius: 9px 9px 50% 50% / 9px 9px 6px 6px;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.25) 0%,
-    rgba(255, 255, 255, 0.04) 85%,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.03) 85%,
     transparent 100%
   );
   pointer-events: none;
 }
 
-
-
 /* ── Avatar ── */
 .overlay-avatar-wrap {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   align-self: center;
   display: flex;
@@ -102,6 +83,7 @@
   border: 1px solid rgba(255, 255, 255, 0.32);
   user-select: none;
   -webkit-user-select: none;
+  cursor: default;
 }
 
 .overlay-avatar-img {
@@ -116,7 +98,7 @@
 }
 
 .overlay-avatar-fallback {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #ffffff;
   text-transform: uppercase;
@@ -128,14 +110,14 @@
 /* ── Plan tier badge (bottom-left of avatar) ── */
 .overlay-tier-badge {
   position: absolute;
-  bottom: -3px;
+  bottom: -2px;
   left: -4px;
-  min-width: 14px;
-  height: 14px;
+  min-width: 13px;
+  height: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 3px;
   background: transparent;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -151,20 +133,22 @@
   text-transform: uppercase;
   user-select: none;
   white-space: nowrap;
+  pointer-events: auto;
+  cursor: default;
   z-index: 2;
 }
 
 /* ── Provider badge (bottom-right of avatar) ── */
 .overlay-provider-badge {
   position: absolute;
-  bottom: -3px;
+  bottom: -2px;
   right: -4px;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 3px;
   background: transparent;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -192,20 +176,20 @@
   position: absolute;
   top: -3px;
   right: -4px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3.5px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: 3px;
   background: transparent;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-top: 1px solid rgba(255, 255, 255, 0.6);
   box-sizing: border-box;
-  font-size: 7.5px;
+  font-size: 7px;
   font-weight: 800;
   color: #ffffff;
   line-height: 1;
@@ -214,7 +198,8 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: default;
   white-space: nowrap;
   z-index: 3;
 }
@@ -225,38 +210,78 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  justify-content: center;
+  gap: 2px;
 }
 
 /* ── Horizontal families row (for multi-family Antigravity mode) ── */
 .overlay-families-row {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0.25rem;
+}
+
+/* ── Single-provider parallel layout (for ChatGPT Codex / Claude) ── */
+.overlay-single-family {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   width: 100%;
+  max-width: 100%;
+}
+
+.overlay-parallel-bars {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.overlay-parallel-bars .overlay-progress-track {
+  width: 44px;
+  flex: 0 0 44px;
+  max-width: 48px;
+}
+
+.overlay-parallel-bars > .overlay-metric-row:only-child .overlay-progress-track {
+  width: 52px;
+  flex: 0 0 52px;
+  max-width: 56px;
 }
 
 /* One model-family column */
 .overlay-family-col {
-  flex: 1;
+  flex: 0 0 auto;
+  width: auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .overlay-family-col + .overlay-family-col {
-  padding-left: 8px;
+  padding-left: 10px;
+  margin-left: 10px;
   border-left: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-/* Logo centered above each family column's bars — no label */
+/* Logo centered above each family column's bars */
 .overlay-family-logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 3px;
-  height: 13px;
+  margin-bottom: 1px;
+  height: 11px;
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
@@ -275,7 +300,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
@@ -303,37 +328,46 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 100%;
+  width: auto;
 }
 
 .overlay-metric-label {
   font-size: 7px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.7);
   width: 13px;
   flex-shrink: 0;
   text-transform: uppercase;
+  letter-spacing: 0.1px;
 }
 
 .overlay-progress-track {
-  flex: 1;
-  height: 3.5px;
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 2px;
+  width: 40px;
+  min-width: 0;
+  max-width: 44px;
+  flex: 0 0 40px;
+  height: 4.5px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  border-radius: 9999px;
   overflow: hidden;
 }
 
 .overlay-progress-bar {
+  width: 100%;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 9999px;
   background: rgba(255, 255, 255, 0.85);
-  transition: width 0.35s ease, background 0.35s ease;
+  transform-origin: left center;
+  transition:
+    transform 0.35s ease,
+    background 0.35s ease;
 }
 
 .overlay-metric-pct {
   font-size: 8px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   width: 22px;
   text-align: right;
   flex-shrink: 0;
@@ -344,30 +378,31 @@
 .overlay-context-menu {
   position: fixed;
   z-index: 9999;
-  width: 108px;
-  max-height: calc(100vh - 4px);
+  width: 95px;
+  zoom: var(--overlay-ui-scale, 1);
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.16) 0%,
-    rgba(30, 36, 52, 0.90) 45%,
+    rgba(30, 36, 52, 0.9) 45%,
     rgba(18, 22, 34, 0.96) 100%
   );
   background-clip: padding-box;
   backdrop-filter: blur(18px) saturate(190%);
   -webkit-backdrop-filter: blur(18px) saturate(190%);
-  border-radius: 5px;
+  border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-top: 1px solid rgba(255, 255, 255, 0.6);
   border-left: 1px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
-  padding: 2px;
+  padding: 3px;
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
   box-sizing: border-box;
   user-select: none;
   animation: overlay-menu-fade-in 0.1s ease-out;
-  overflow: hidden;
+  overflow: visible;
 }
 
 @keyframes overlay-menu-fade-in {
@@ -382,27 +417,26 @@
 }
 
 .overlay-menu-item {
-  display: flex;
+  position: relative;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 1px 5px;
-  border-radius: 3px;
+  justify-content: center;
+  border-radius: 4px;
   font-family: inherit;
-  font-size: 8.5px;
-  line-height: 1.15;
-  font-weight: 500;
   color: rgba(255, 255, 255, 0.92);
   background: transparent;
   border: none;
   outline: none;
   cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
   box-sizing: border-box;
-  height: 18px;
-  min-height: 18px;
-  white-space: nowrap;
 }
 
 .overlay-menu-item:hover {
@@ -428,6 +462,10 @@
   color: #fca5a5;
 }
 
+.overlay-menu-item[title] {
+  overflow: visible;
+}
+
 /* ── Liquid Glass Custom Tooltip ── */
 .overlay-tooltip {
   position: absolute;
@@ -440,7 +478,7 @@
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.16) 0%,
-    rgba(32, 40, 58, 0.90) 45%,
+    rgba(32, 40, 58, 0.9) 45%,
     rgba(18, 22, 34, 0.96) 100%
   );
   background-clip: padding-box;
@@ -450,7 +488,7 @@
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-top: 1px solid rgba(255, 255, 255, 0.55);
   border-left: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
   padding: 2.5px 7px;
   max-width: calc(100vw - 8px);
   width: max-content;
@@ -462,9 +500,8 @@
   animation: overlay-tooltip-fade-in 0.12s ease-out;
 }
 
-/* Liquid glossy specular reflection on upper half of tooltip */
 .overlay-tooltip::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -480,9 +517,8 @@
   pointer-events: none;
 }
 
-/* Upward pointer arrow pointing directly to center of the overlay at bottom */
 .overlay-tooltip::after {
-  content: '';
+  content: "";
   position: absolute;
   top: -3px;
   left: 50%;
@@ -495,9 +531,8 @@
   pointer-events: none;
 }
 
-/* Downward pointer arrow pointing directly to center of the overlay at top */
 .overlay-tooltip--above::after {
-  content: '';
+  content: "";
   position: absolute;
   top: auto;
   bottom: -3px;
@@ -512,66 +547,3 @@
   border-right: 1px solid rgba(255, 255, 255, 0.28);
   pointer-events: none;
 }
-
-/* Dedicated tooltip overlay window root */
-.overlay-tooltip-root {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  overflow: hidden;
-  position: relative;
-}
-
-.overlay-tooltip-root .overlay-tooltip {
-  position: relative;
-  top: auto;
-  left: auto;
-  transform: none;
-  max-width: calc(100vw - 16px);
-  animation: overlay-tooltip-fade-in-centered 0.12s ease-out;
-}
-
-@keyframes overlay-tooltip-fade-in-centered {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.overlay-container .overlay-tooltip {
-  display: none;
-}
-
-.overlay-tooltip-text {
-  position: relative;
-  z-index: 1;
-  font-size: 7.5px;
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.1px;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  white-space: nowrap;
-  max-width: calc(100vw - 24px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@keyframes overlay-tooltip-fade-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -2px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-
