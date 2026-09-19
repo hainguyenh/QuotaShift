@@ -29,12 +29,10 @@ export const AntigravityOAuthStepView: React.FC<AntigravityOAuthStepViewProps> =
           <div className="oauth-step-body">
             <p className="oauth-step-title">Sign in with Google</p>
             <p className="oauth-step-desc">
-              Grants cloud-platform scope needed for quota API. Tokens are also written back to
-              your Antigravity IDE session.
+              Grants cloud-platform scope needed for quota API. Tokens are also written back to your
+              Antigravity IDE session.
             </p>
-            <div
-              style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}
-            >
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 className={`oauth-open-btn ${oauthStep > 1 ? "oauth-open-btn--done" : ""} ${oauthLoading && oauthStep === 1 ? "loading" : ""}`}
                 onClick={handleStartBrowserLogin}
@@ -121,8 +119,7 @@ export const AntigravityOAuthStepView: React.FC<AntigravityOAuthStepViewProps> =
           <div className="oauth-step-body">
             <p className="oauth-step-title">Connected!</p>
             <p className="oauth-step-desc">
-              Your Antigravity account is connected. Tokens are written to the IDE session
-              stores.
+              Your Antigravity account is connected. Tokens are written to the IDE session stores.
             </p>
           </div>
         </li>
