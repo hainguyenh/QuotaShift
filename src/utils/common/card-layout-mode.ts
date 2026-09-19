@@ -69,4 +69,3 @@ export function formatCompactTierName(raw: string | null | undefined): string {
   if (lower.includes("enterprise") || lower.includes("ent")) return "ENT";
   return raw.toUpperCase();
 }
-

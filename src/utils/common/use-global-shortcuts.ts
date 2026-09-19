@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
-import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { loadShortcutPreferences } from "./shortcuts";
 import { createShortcutRegistrationController } from "./shortcut-registration";
 
 export function useGlobalShortcuts(
   onToggleOverlay: () => void,
-  onRefreshAccount: () => void
+  onRefreshAccount: () => void,
 ): void {
   const toggleRef = useRef(onToggleOverlay);
   const refreshRef = useRef(onRefreshAccount);
@@ -18,6 +18,7 @@ export function useGlobalShortcuts(
   useEffect(() => {
     const controller = createShortcutRegistrationController(
       {
+        isRegistered: async (shortcut) => isRegistered(shortcut),
         register: async (shortcut, onPressed) => {
           await register(shortcut, (event) => {
             if (event.state === "Pressed") onPressed();

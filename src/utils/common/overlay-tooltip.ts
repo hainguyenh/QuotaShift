@@ -1,34 +1,41 @@
 import type { OverlayAccountData } from "./overlay-types";
 
 export type OverlayHoverZone =
-  | "avatar"
-  | "tier_platform"
-  | "reset"
-  | "guardrail_five_hour"
-  | "guardrail_weekly"
-  | "other";
+  "avatar" | "tier_platform" | "reset" | "guardrail_five_hour" | "guardrail_weekly" | "other";
 
 export function formatResetExpiry(isoDate: string | number | undefined | null): string {
   if (!isoDate) return "";
-  const d = typeof isoDate === "number"
-    ? new Date(isoDate < 1e11 ? isoDate * 1000 : isoDate)
-    : new Date(isoDate);
+  const d =
+    typeof isoDate === "number"
+      ? new Date(isoDate < 1e11 ? isoDate * 1000 : isoDate)
+      : new Date(isoDate);
   if (isNaN(d.getTime())) return "";
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const month = months[d.getMonth()];
   const day = d.getDate();
-  const rawHours = d.getHours();
-  const ampm = rawHours >= 12 ? "PM" : "AM";
-  const hour12 = rawHours % 12 || 12;
+  const hour = String(d.getHours()).padStart(2, "0");
   const minute = String(d.getMinutes()).padStart(2, "0");
 
-  return `${month} ${day} - ${hour12}:${minute} ${ampm}`;
+  return `${month} ${day} - ${hour}:${minute}`;
 }
 
 export function resolveOverlayPlatformName(provider: "antigravity" | "codex" | "claude"): string {
   if (provider === "codex") return "ChatGPT Codex";
-  if (provider === "claude") return "Claude";
+  if (provider === "claude") return "Claude Code";
   return "Antigravity";
 }
 
@@ -40,17 +47,17 @@ export function getOverlayTooltipText(
   if (!zone) return null;
 
   if (zone === "guardrail_five_hour" && data.claudeGuardrails?.fiveHourEnabled) {
-    return `Claude'll be stopped when hit ${data.claudeGuardrails.fiveHourThresholdPct}% of 5 hrs limit`;
+    return `Claude Code account will be suspended when usage reaches ${data.claudeGuardrails.fiveHourThresholdPct}% of 5 hrs`;
   }
 
   if (zone === "guardrail_weekly" && data.claudeGuardrails?.weeklyEnabled) {
-    return `Claude'll be stopped when hit ${data.claudeGuardrails.weeklyThresholdPct}% of weekly limit`;
+    return `Claude Code account will be suspended when usage reaches ${data.claudeGuardrails.weeklyThresholdPct}% of weekly`;
   }
 
   if (zone === "avatar") {
     const aliasName = data.label || "Account";
     const email = data.email || "";
-    return email && aliasName ? `${aliasName} - ${email}` : (aliasName || email || "Account");
+    return email && aliasName ? `${aliasName} - ${email}` : aliasName || email || "Account";
   }
 
   if (zone === "tier_platform") {
@@ -79,7 +86,8 @@ export function detectOverlayHoverZone(el: HTMLElement | null): OverlayHoverZone
   if (el.closest(".overlay-guardrail-badge--five-hour")) return "guardrail_five_hour";
   if (el.closest(".overlay-guardrail-badge--weekly")) return "guardrail_weekly";
   if (el.closest(".overlay-reset-badge")) return "reset";
-  if (el.closest(".overlay-tier-badge") || el.closest(".overlay-provider-badge")) return "tier_platform";
+  if (el.closest(".overlay-tier-badge") || el.closest(".overlay-provider-badge"))
+    return "tier_platform";
   if (el.closest(".overlay-avatar-wrap")) return "avatar";
   if (el.closest(".glass-card")) return "other";
   return null;

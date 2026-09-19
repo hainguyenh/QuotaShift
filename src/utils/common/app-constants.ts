@@ -11,7 +11,16 @@ export const ANTIGRAVITY_ORDER_KEY = "antigravity-account-order";
 export const OVERLAY_TRACKED_PROVIDER_KEY = "quotashift_overlay_tracked_provider";
 export const OVERLAY_TRACKED_ACCOUNT_ID_KEY = "quotashift_overlay_tracked_account_id";
 export const THEME_KEY = "antigravity-theme";
+export const APP_THEME_EVENT = "app-theme-changed";
 export const KEEP_ALIVE_KEY = "keepAliveActive";
+export const KEEP_ALIVE_DEFAULT_ENABLED = true;
+
+type StorageReader = Pick<Storage, "getItem">;
+
+export const loadKeepAlivePreference = (storage: StorageReader = localStorage): boolean => {
+  const saved = storage.getItem(KEEP_ALIVE_KEY);
+  return saved === null ? KEEP_ALIVE_DEFAULT_ENABLED : saved !== "false";
+};
 export const OVERLAY_ENABLED_KEY = "quotashift_overlay_enabled";
 export const OFFICIAL_RELEASE_URL = "https://github.com/the-long-ride/QuotaShift/releases/latest";
 

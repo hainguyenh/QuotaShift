@@ -1,18 +1,53 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, emit } from "@tauri-apps/api/event";
-import { THEME_KEY, KEEP_ALIVE_KEY, OVERLAY_ENABLED_KEY } from "../utils/common/app-constants";
+import { listen, emit, emitTo } from "@tauri-apps/api/event";
+import {
+  APP_THEME_EVENT,
+  THEME_KEY,
+  KEEP_ALIVE_KEY,
+  OVERLAY_ENABLED_KEY,
+  loadKeepAlivePreference,
+} from "../utils/common/app-constants";
 
 export const useAppThemeAndOverlay = () => {
-  const [isDarkMode, setIsDarkMode] = useState(() => (localStorage.getItem(THEME_KEY) || "dark") === "dark");
-  const [keepAliveActive, setKeepAliveActive] = useState(() => localStorage.getItem(KEEP_ALIVE_KEY) !== "false");
-  const [overlayEnabled, setOverlayEnabled] = useState(() => localStorage.getItem(OVERLAY_ENABLED_KEY) !== "false");
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => (localStorage.getItem(THEME_KEY) || "dark") === "dark",
+  );
+  const [keepAliveActive, setKeepAliveActive] = useState(() => loadKeepAlivePreference());
+  const [overlayEnabled, setOverlayEnabled] = useState(
+    () => localStorage.getItem(OVERLAY_ENABLED_KEY) !== "false",
+  );
   const [isOnline, setIsOnline] = useState(true);
   const [statusText, setStatusText] = useState("Ready");
+
+  const publishAppTheme = (theme: string) => {
+    void Promise.allSettled([
+      emitTo("overlay", APP_THEME_EVENT, theme),
+      emitTo("overlay-tooltip", APP_THEME_EVENT, theme),
+    ]);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem(THEME_KEY) || "dark";
     document.documentElement.setAttribute("data-theme", saved);
+    publishAppTheme(saved);
+  }, []);
+
+  useEffect(() => {
+    let unlistenTheme: (() => void) | undefined;
+    listen<string>(APP_THEME_EVENT, (event) => {
+      const nextTheme = event.payload === "light" ? "light" : "dark";
+      setIsDarkMode(nextTheme === "dark");
+      document.documentElement.setAttribute("data-theme", nextTheme);
+      localStorage.setItem(THEME_KEY, nextTheme);
+    })
+      .then((u) => {
+        unlistenTheme = u;
+      })
+      .catch(() => {});
+    return () => {
+      unlistenTheme?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -21,8 +56,14 @@ export const useAppThemeAndOverlay = () => {
       if (typeof event.payload === "boolean") {
         setOverlayEnabled(event.payload);
       }
-    }).then((u) => { unlisten = u; }).catch(() => {});
-    return () => { unlisten?.(); };
+    })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch(() => {});
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   const handleToggleTheme = () => {
@@ -31,6 +72,7 @@ export const useAppThemeAndOverlay = () => {
     setIsDarkMode(next);
     document.documentElement.setAttribute("data-theme", nextTheme);
     localStorage.setItem(THEME_KEY, nextTheme);
+    publishAppTheme(nextTheme);
   };
 
   const handleToggleKeepAlive = async () => {

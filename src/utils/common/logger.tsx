@@ -79,6 +79,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     return { hasError: true, error };
   }
 
+  componentDidMount() {
+    const meta = import.meta as unknown as {
+      hot?: { on: (event: string, cb: () => void) => void };
+      env?: { DEV?: boolean };
+    };
+    if (meta.hot) {
+      meta.hot.on("vite:beforeUpdate", () => {
+        if (this.state.hasError) {
+          this.setState({ hasError: false, error: null, errorInfo: null });
+        }
+      });
+    }
+  }
+
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     logFrontend(
@@ -87,6 +101,28 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       `React ErrorBoundary caught error: ${error.message}`,
       errorInfo.componentStack,
     );
+
+    const meta = import.meta as unknown as { env?: { DEV?: boolean } };
+    if (meta.env?.DEV) {
+      const msg = error.message || "";
+      const isHmrHookMismatch =
+        msg.includes("Should have a queue") ||
+        msg.includes("Rendered more hooks") ||
+        msg.includes("Rendered fewer hooks") ||
+        msg.includes("invalid-hook-call");
+
+      if (isHmrHookMismatch) {
+        const lastReload = Number(sessionStorage.getItem("__hmr_hook_reload__") || "0");
+        const now = Date.now();
+        if (now - lastReload > 3000) {
+          sessionStorage.setItem("__hmr_hook_reload__", String(now));
+          console.warn(
+            "[ErrorBoundary] HMR hook mismatch detected after code edit. Auto-reloading cleanly...",
+          );
+          window.location.reload();
+        }
+      }
+    }
   }
 
   render() {

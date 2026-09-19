@@ -5,8 +5,16 @@ const readString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value : undefined;
 
 export const parseCodexLocalAuth = (auth: unknown, label?: string): CodexAccount | null => {
-  if (!auth || typeof auth !== "object") return null;
-  const values = auth as Record<string, unknown>;
+  let parsedAuth = auth;
+  if (typeof parsedAuth === "string") {
+    try {
+      parsedAuth = JSON.parse(parsedAuth);
+    } catch {
+      return null;
+    }
+  }
+  if (!parsedAuth || typeof parsedAuth !== "object" || Array.isArray(parsedAuth)) return null;
+  const values = parsedAuth as Record<string, unknown>;
   const authMode = readString(values.auth_mode);
 
   if (authMode === "chatgpt" && values.tokens && typeof values.tokens === "object") {
@@ -68,7 +76,7 @@ export const buildCodexAuthContent = (apiKeyRaw: string): string => {
           last_refresh: data.lastRefresh || new Date().toISOString(),
         },
         null,
-        2
+        2,
       );
     } catch {
       // fallback

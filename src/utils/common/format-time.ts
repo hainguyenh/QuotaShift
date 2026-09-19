@@ -1,52 +1,36 @@
-/**
- * Format an ISO date string for quota reset display.
- * Shared by AntigravityTab and CodexTab.
- */
+/** Format an ISO reset date as a compact local 24-hour label. */
 export function formatAbsoluteTime(isoDate: string, now: Date = new Date()): string {
   if (!isoDate || isoDate === "Exhausted" || isoDate === "Ready") return isoDate || "—";
   const futureDate = new Date(isoDate);
   if (isNaN(futureDate.getTime())) return "—";
 
-  const ampm = futureDate.getHours() >= 12 ? "PM" : "AM";
-  let hour12 = futureDate.getHours() % 12;
-  hour12 = hour12 ? hour12 : 12;
-  const minStr = String(futureDate.getMinutes()).padStart(2, "0");
-  const timeStr = `${hour12}:${minStr} ${ampm}`;
+  const timeStr = `${String(futureDate.getHours()).padStart(2, "0")}:${String(
+    futureDate.getMinutes(),
+  ).padStart(2, "0")}`;
 
   const isCurrentDay =
     futureDate.getDate() === now.getDate() &&
     futureDate.getMonth() === now.getMonth() &&
     futureDate.getFullYear() === now.getFullYear();
-
-  if (isCurrentDay) {
-    return `Resets at: ${timeStr}`;
-  }
+  if (isCurrentDay) return timeStr;
 
   const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const isTomorrow =
     futureDate.getDate() === tomorrow.getDate() &&
     futureDate.getMonth() === tomorrow.getMonth() &&
     futureDate.getFullYear() === tomorrow.getFullYear();
+  if (isTomorrow) return `Tomorrow ${timeStr}`;
 
-  if (isTomorrow) {
-    return `Tomorrow at ${timeStr}`;
+  const month = futureDate.toLocaleString("en", { month: "short" });
+  return `${month} ${futureDate.getDate()}, ${timeStr}`;
+}
+
+export function formatUsageLimitTooltip(label: string, resetLabel: string): string {
+  const reset = resetLabel?.trim() || "Unavailable";
+  if (reset === "Ready") return `${label} usage limit - ready now`;
+  if (reset === "Disabled") return `${label} usage limit - disabled`;
+  if (reset === "Unavailable" || reset === "Reset unavailable" || reset === "—") {
+    return `${label} usage limit - reset unavailable`;
   }
-
-  const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-  const month = MONTHS[futureDate.getMonth()];
-  const day = futureDate.getDate();
-  return `Resets at: ${month} ${day}, ${timeStr}`;
+  return `${label} usage limit - reset at ${reset}`;
 }

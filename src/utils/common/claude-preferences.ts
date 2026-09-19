@@ -1,18 +1,17 @@
+import { syncClaudeGuardrailsToOverlay } from "./claude-overlay-sync.js";
+
 /** Preferences for Claude local monitoring and usage guardrails. */
 
 export const CLAUDE_POLL_INTERVAL_KEY = "quotashift_claude_poll_interval_secs";
 export const CLAUDE_STOP_THRESHOLD_KEY = "quotashift_claude_stop_threshold_pct";
 export const CLAUDE_GUARDRAILS_ENABLED_KEY = "quotashift_claude_guardrails_enabled";
-export const CLAUDE_GUARDRAILS_WINDOW_DRIVEN_KEY =
-  "quotashift_claude_guardrails_window_driven_v1";
+export const CLAUDE_AUTO_RESUME_AT_RESET_KEY = "quotashift_claude_auto_resume_at_reset_v1";
+export const CLAUDE_GUARDRAILS_WINDOW_DRIVEN_KEY = "quotashift_claude_guardrails_window_driven_v1";
 export const CLAUDE_PREFERENCES_CHANGED_EVENT = "quotashift:claude-preferences-changed";
 export const CLAUDE_FIVE_HOUR_STOP_ENABLED_KEY = "quotashift_claude_five_hour_stop_enabled";
-export const CLAUDE_FIVE_HOUR_STOP_THRESHOLD_KEY =
-  "quotashift_claude_five_hour_stop_threshold_pct";
+export const CLAUDE_FIVE_HOUR_STOP_THRESHOLD_KEY = "quotashift_claude_five_hour_stop_threshold_pct";
 export const CLAUDE_WEEKLY_STOP_ENABLED_KEY = "quotashift_claude_weekly_stop_enabled";
 export const CLAUDE_WEEKLY_STOP_THRESHOLD_KEY = "quotashift_claude_weekly_stop_threshold_pct";
-
-const CLAUDE_OVERLAY_DATA_KEY = "quotashift_overlay_data";
 
 export const DEFAULT_CLAUDE_POLL_INTERVAL_SECS = 20;
 export const MIN_CLAUDE_POLL_INTERVAL_SECS = 5;
@@ -30,6 +29,7 @@ export interface ClaudePreferences {
   pollIntervalSecs: number;
   /** Backward-compatible derived flag. Window switches are the source of truth. */
   enabled: boolean;
+  autoResumeAtReset: boolean;
   fiveHour: ClaudeGuardrailWindowPreference;
   weekly: ClaudeGuardrailWindowPreference;
 }
@@ -84,6 +84,7 @@ export function normalizeClaudePreferences(preferences: ClaudePreferences): Clau
   return {
     pollIntervalSecs: sanitizeClaudePollInterval(preferences.pollIntervalSecs),
     enabled: fiveHour.enabled || weekly.enabled,
+    autoResumeAtReset: Boolean(preferences.autoResumeAtReset),
     fiveHour,
     weekly,
   };
@@ -110,6 +111,10 @@ export function loadClaudePreferences(storage: StorageReader = localStorage): Cl
     const weeklyEnabledRaw = storage.getItem(CLAUDE_WEEKLY_STOP_ENABLED_KEY);
     const masterEnabledRaw = storage.getItem(CLAUDE_GUARDRAILS_ENABLED_KEY);
     const windowDriven = storage.getItem(CLAUDE_GUARDRAILS_WINDOW_DRIVEN_KEY) === "true";
+    const autoResumeAtReset = parseStoredBoolean(
+      storage.getItem(CLAUDE_AUTO_RESUME_AT_RESET_KEY),
+      false,
+    );
 
     let fiveHourEnabled = parseStoredBoolean(fiveHourEnabledRaw, hasLegacyThreshold);
     let weeklyEnabled = parseStoredBoolean(weeklyEnabledRaw, hasLegacyThreshold);
@@ -121,6 +126,7 @@ export function loadClaudePreferences(storage: StorageReader = localStorage): Cl
     return normalizeClaudePreferences({
       pollIntervalSecs: loadPollInterval(storage),
       enabled: fiveHourEnabled || weeklyEnabled,
+      autoResumeAtReset,
       fiveHour: {
         enabled: fiveHourEnabled,
         thresholdPct:
@@ -140,54 +146,41 @@ export function loadClaudePreferences(storage: StorageReader = localStorage): Cl
     return {
       pollIntervalSecs: DEFAULT_CLAUDE_POLL_INTERVAL_SECS,
       enabled: false,
+      autoResumeAtReset: false,
       fiveHour: { enabled: false, thresholdPct: DEFAULT_CLAUDE_STOP_THRESHOLD_PCT },
       weekly: { enabled: false, thresholdPct: DEFAULT_CLAUDE_STOP_THRESHOLD_PCT },
     };
   }
 }
 
-function syncClaudeGuardrailsOverlaySnapshot(preferences: ClaudePreferences): void {
-  if (typeof localStorage === "undefined") return;
-  try {
-    const raw = localStorage.getItem(CLAUDE_OVERLAY_DATA_KEY);
-    if (!raw) return;
-    const current = JSON.parse(raw);
-    if (current?.provider !== "claude") return;
-    localStorage.setItem(
-      CLAUDE_OVERLAY_DATA_KEY,
-      JSON.stringify({
-        ...current,
-        claudeGuardrails: {
-          fiveHourEnabled: preferences.fiveHour.enabled,
-          fiveHourThresholdPct: preferences.fiveHour.thresholdPct,
-          weeklyEnabled: preferences.weekly.enabled,
-          weeklyThresholdPct: preferences.weekly.thresholdPct,
-        },
-      }),
-    );
-  } catch {}
-}
-
 export function saveClaudePreferences(
   preferences: ClaudePreferences,
   storage: StorageWriter = localStorage,
-): void {
+): boolean {
+  const normalized = normalizeClaudePreferences(preferences);
+  let persisted = true;
+
   try {
-    const normalized = normalizeClaudePreferences(preferences);
     storage.setItem(CLAUDE_POLL_INTERVAL_KEY, String(normalized.pollIntervalSecs));
     storage.setItem(CLAUDE_GUARDRAILS_ENABLED_KEY, String(normalized.enabled));
     storage.setItem(CLAUDE_GUARDRAILS_WINDOW_DRIVEN_KEY, "true");
+    storage.setItem(CLAUDE_AUTO_RESUME_AT_RESET_KEY, String(normalized.autoResumeAtReset));
     storage.setItem(CLAUDE_FIVE_HOUR_STOP_ENABLED_KEY, String(normalized.fiveHour.enabled));
     storage.setItem(CLAUDE_FIVE_HOUR_STOP_THRESHOLD_KEY, String(normalized.fiveHour.thresholdPct));
     storage.setItem(CLAUDE_WEEKLY_STOP_ENABLED_KEY, String(normalized.weekly.enabled));
     storage.setItem(CLAUDE_WEEKLY_STOP_THRESHOLD_KEY, String(normalized.weekly.thresholdPct));
-    if (typeof window !== "undefined") {
-      if (typeof localStorage !== "undefined" && storage === localStorage) {
-        syncClaudeGuardrailsOverlaySnapshot(normalized);
-      }
-      window.dispatchEvent(new CustomEvent(CLAUDE_PREFERENCES_CHANGED_EVENT, { detail: normalized }));
+  } catch {
+    persisted = false;
+  }
+
+  if (typeof window !== "undefined") {
+    if (persisted && typeof localStorage !== "undefined" && storage === localStorage) {
+      syncClaudeGuardrailsToOverlay(normalized);
     }
-  } catch {}
+    window.dispatchEvent(new CustomEvent(CLAUDE_PREFERENCES_CHANGED_EVENT, { detail: normalized }));
+  }
+
+  return persisted;
 }
 
 /** Backward-compatible helpers for older callers. */

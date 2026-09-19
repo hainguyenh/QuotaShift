@@ -21,7 +21,7 @@ export interface CodexResetCreditsData {
 
 export function formatResetTimeRemaining(
   expiresAt: string | number | undefined,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
 ): string {
   if (!expiresAt) return "N/A";
   const expireMs =
@@ -55,16 +55,21 @@ export function formatResetDatePair(isoString: string | undefined): { utc: strin
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return { utc: String(isoString), local: String(isoString) };
 
-  const utcStr = d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  const utcStr = d
+    .toISOString()
+    .replace("T", " ")
+    .replace(/\.\d+Z$/, " UTC");
   const localStr = d.toLocaleString();
   return { utc: utcStr, local: localStr };
 }
 
 export function getEarliestExpiringCredit(
-  credits: CodexResetCreditItem[] | undefined
+  credits: CodexResetCreditItem[] | undefined,
 ): CodexResetCreditItem | null {
   if (!credits || credits.length === 0) return null;
-  const available = credits.filter((c) => (c.status || "available") === "available" && c.expires_at);
+  const available = credits.filter(
+    (c) => (c.status || "available") === "available" && c.expires_at,
+  );
   if (available.length === 0) return credits[0] || null;
 
   return available.reduce((earliest, curr) => {
@@ -105,9 +110,9 @@ export function buildResetCreditsTooltip(data: CodexResetCreditsData | null | un
 
     lines.push(
       `[#${idx + 1}] ${title} (${status})\n` +
-      `  • Remaining: ${remain}\n` +
-      `  • Expires: ${expires.local} (UTC: ${expires.utc})\n` +
-      `  • Granted: ${granted.local} (UTC: ${granted.utc})`
+        `  • Remaining: ${remain}\n` +
+        `  • Expires: ${expires.local} (UTC: ${expires.utc})\n` +
+        `  • Granted: ${granted.local} (UTC: ${granted.utc})`,
     );
   });
 

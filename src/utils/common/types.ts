@@ -70,8 +70,6 @@ export interface CodexModelCatalogCacheEntry {
   error?: string;
 }
 
-
-
 export interface CodexTierModelGroup {
   tier: string;
   accountCount: number;
@@ -282,3 +280,5 @@ export interface ClaudeMonitorStatus {
   localUsage: ClaudeObservedUsage | null;
   error: string | null;
 }
+
+export type { ClaudeAccount, ClaudeAccountUsageStatus } from "../claude/claude-account-types";

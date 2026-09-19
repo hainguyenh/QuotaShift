@@ -36,12 +36,18 @@ export function sanitizePollInterval(value: unknown): number {
 
 export function sanitizeTrackedPollInterval(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.min(MAX_TRACKED_POLL_INTERVAL_SECS, Math.max(MIN_TRACKED_POLL_INTERVAL_SECS, Math.round(value)));
+    return Math.min(
+      MAX_TRACKED_POLL_INTERVAL_SECS,
+      Math.max(MIN_TRACKED_POLL_INTERVAL_SECS, Math.round(value)),
+    );
   }
   if (typeof value === "string") {
     const parsed = parseInt(value.trim(), 10);
     if (Number.isFinite(parsed)) {
-      return Math.min(MAX_TRACKED_POLL_INTERVAL_SECS, Math.max(MIN_TRACKED_POLL_INTERVAL_SECS, parsed));
+      return Math.min(
+        MAX_TRACKED_POLL_INTERVAL_SECS,
+        Math.max(MIN_TRACKED_POLL_INTERVAL_SECS, parsed),
+      );
     }
   }
   return DEFAULT_TRACKED_POLL_INTERVAL_SECS;
@@ -49,7 +55,10 @@ export function sanitizeTrackedPollInterval(value: unknown): number {
 
 export function sanitizeIdlePollInterval(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.min(MAX_IDLE_POLL_INTERVAL_SECS, Math.max(MIN_IDLE_POLL_INTERVAL_SECS, Math.round(value)));
+    return Math.min(
+      MAX_IDLE_POLL_INTERVAL_SECS,
+      Math.max(MIN_IDLE_POLL_INTERVAL_SECS, Math.round(value)),
+    );
   }
   if (typeof value === "string") {
     const parsed = parseInt(value.trim(), 10);
@@ -102,7 +111,9 @@ export function saveTrackedPollIntervalPreference(
     const sanitized = sanitizeTrackedPollInterval(interval);
     storage.setItem(TRACKED_POLL_INTERVAL_KEY, String(sanitized));
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(TRACKED_POLL_INTERVAL_CHANGED_EVENT, { detail: sanitized }));
+      window.dispatchEvent(
+        new CustomEvent(TRACKED_POLL_INTERVAL_CHANGED_EVENT, { detail: sanitized }),
+      );
     }
   } catch {}
 }

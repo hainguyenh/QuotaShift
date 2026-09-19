@@ -3,10 +3,7 @@ export interface SearchableAccount {
   email?: string | null;
 }
 
-export function matchesAccountQuery(
-  account: SearchableAccount,
-  query?: string | null,
-): boolean {
+export function matchesAccountQuery(account: SearchableAccount, query?: string | null): boolean {
   const normalized = (query || "").trim().toLowerCase();
   if (!normalized) return true;
   const nameMatch = account.label ? account.label.toLowerCase().includes(normalized) : false;
