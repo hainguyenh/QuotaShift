@@ -13,7 +13,7 @@ function runPrettier(args) {
 
   const targets = filteredArgs.length > 0
     ? filteredArgs
-    : ["src/**/*.{ts,tsx}", "vite.config.ts"];
+    : ["src/**/*.{ts,tsx,css}", "src/styles.css", "index.html", "vite.config.ts"];
 
   const prettierArgs = [
     prettierBin,
@@ -21,7 +21,7 @@ function runPrettier(args) {
     ...targets,
   ];
 
-  console.log(`\n[1/2] Running Prettier on TS/TSX files (${isCheck ? "check" : "write"})...`);
+  console.log(`\n[1/2] Running Prettier on TS/TSX/CSS/HTML files (${isCheck ? "check" : "write"})...`);
   const result = spawnSync(process.execPath, prettierArgs, {
     cwd: root,
     stdio: "inherit",
@@ -63,7 +63,7 @@ function main() {
   const isCheck = args.includes("--check");
 
   console.log(`======================================================================`);
-  console.log(`            Code Formatting: TypeScript, TSX & Rust                   `);
+  console.log(`        Code Formatting: TypeScript, TSX, CSS, HTML & Rust            `);
   console.log(`======================================================================`);
   console.log(`Mode: ${isCheck ? "Check only" : "Format in-place"}`);
 
@@ -74,14 +74,14 @@ function main() {
   const prettierOk = prettierStatus === 0;
   const cargoOk = cargoStatus === 0;
 
-  console.log(`Prettier (TS/TSX) : ${prettierOk ? "PASSED" : "FAILED"}`);
-  console.log(`Cargo fmt (Rust)  : ${cargoOk ? "PASSED" : "FAILED"}`);
+  console.log(`Prettier (TS/TSX/CSS/HTML) : ${prettierOk ? "PASSED" : "FAILED"}`);
+  console.log(`Cargo fmt (Rust)           : ${cargoOk ? "PASSED" : "FAILED"}`);
   console.log("----------------------------------------------------------------------");
 
   if (!prettierOk || !cargoOk) {
     process.exit(1);
   } else {
-    console.log(`All TS, TSX, and RS files are formatted cleanly!`);
+    console.log(`All TS, TSX, CSS, HTML, and RS files are formatted cleanly!`);
     process.exit(0);
   }
 }
