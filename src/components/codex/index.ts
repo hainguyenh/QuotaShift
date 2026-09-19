@@ -9,3 +9,6 @@ export * from "./CodexPoolModal";
 export * from "./CodexSpendBreakdown";
 export * from "./CodexResetCreditsDialog";
 export * from "./CodexTab";
+export * from "./CodexTabEmpty";
+export * from "./CodexRenameInput";
+export * from "./CodexCardError";

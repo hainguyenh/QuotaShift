@@ -15,7 +15,11 @@ const compactFormatter = new Intl.NumberFormat("en-US", {
 export const CodexSpendBreakdown: React.FC<CodexSpendBreakdownProps> = ({ snapshot }) => {
   const models = snapshot?.models || [];
   if (models.length === 0) {
-    return <div style={{ fontSize: "8.5px", color: "var(--text-secondary)" }}>No usage recorded this period.</div>;
+    return (
+      <div style={{ fontSize: "8.5px", color: "var(--text-secondary)" }}>
+        No usage recorded this period.
+      </div>
+    );
   }
 
   const totalSpend = models.reduce((sum: number, m: any) => sum + (m.costUsd || 0), 0);
@@ -25,10 +29,21 @@ export const CodexSpendBreakdown: React.FC<CodexSpendBreakdownProps> = ({ snapsh
       {snapshot.models.map((m: any, idx: number) => {
         const pct = totalSpend > 0 ? Math.round((m.costUsd / totalSpend) * 100) : 0;
         return (
-          <div key={idx} className="codex-spend-row" style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "6px" }}>
-            <div className="quota-item-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="quota-model-name" style={{ fontSize: "9px", fontWeight: 600 }}>{m.model}</span>
-              <span style={{ fontSize: "9px", color: "var(--text-secondary)" }}>{compactFormatter.format(m.costUsd)}</span>
+          <div
+            key={idx}
+            className="codex-spend-row"
+            style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "6px" }}
+          >
+            <div
+              className="quota-item-header"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            >
+              <span className="quota-model-name" style={{ fontSize: "9px", fontWeight: 600 }}>
+                {m.model}
+              </span>
+              <span style={{ fontSize: "9px", color: "var(--text-secondary)" }}>
+                {compactFormatter.format(m.costUsd)}
+              </span>
             </div>
             <div className="quota-limit-bar-container">
               <div className="progress-container">

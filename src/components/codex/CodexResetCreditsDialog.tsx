@@ -50,10 +50,13 @@ export const CodexResetCreditsDialog: React.FC<CodexResetCreditsDialogProps> = (
                 fontSize: "8px",
                 fontWeight: 600,
                 color: availableCount > 0 ? "#10b981" : "var(--text-secondary)",
-                background: availableCount > 0 ? "rgba(16, 185, 129, 0.1)" : "rgba(255, 255, 255, 0.05)",
+                background:
+                  availableCount > 0 ? "rgba(16, 185, 129, 0.1)" : "rgba(255, 255, 255, 0.05)",
                 padding: "1px 5px",
                 borderRadius: "10px",
-                border: "1px solid " + (availableCount > 0 ? "rgba(16, 185, 129, 0.2)" : "var(--border-color)"),
+                border:
+                  "1px solid " +
+                  (availableCount > 0 ? "rgba(16, 185, 129, 0.2)" : "var(--border-color)"),
               }}
             >
               {availableCount} Available
@@ -69,25 +72,57 @@ export const CodexResetCreditsDialog: React.FC<CodexResetCreditsDialogProps> = (
           </button>
         </div>
 
-        <div className="codex-model-dialog-body" style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          <div className="codex-model-dialog-account" style={{ paddingBottom: "4px", borderBottom: "1px solid var(--border-color)" }}>
+        <div
+          className="codex-model-dialog-body"
+          style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+        >
+          <div
+            className="codex-model-dialog-account"
+            style={{ paddingBottom: "4px", borderBottom: "1px solid var(--border-color)" }}
+          >
             <div className="codex-model-dialog-identity">
               <strong style={{ fontSize: "10px" }}>{account.label}</strong>
-              <span style={{ fontSize: "8.5px", color: "var(--text-secondary)" }}>{account.email ?? "No email"}</span>
+              <span style={{ fontSize: "8.5px", color: "var(--text-secondary)" }}>
+                {account.email ?? "No email"}
+              </span>
             </div>
             <div className="codex-model-dialog-meta">
-              <span style={{ fontSize: "8.5px", color: "var(--text-primary)", fontWeight: 600, textTransform: "uppercase" }}>
+              <span
+                style={{
+                  fontSize: "8.5px",
+                  color: "var(--text-primary)",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                }}
+              >
                 {(account.lastPlan ?? "Plan unknown").toUpperCase()}
               </span>
             </div>
           </div>
 
           {credits.length === 0 ? (
-            <div style={{ padding: "12px 0", textAlign: "center", color: "var(--text-secondary)", fontSize: "9px" }}>
-              {isLoading ? "Loading reset credits..." : "No reset credits reported for this account."}
+            <div
+              style={{
+                padding: "12px 0",
+                textAlign: "center",
+                color: "var(--text-secondary)",
+                fontSize: "9px",
+              }}
+            >
+              {isLoading
+                ? "Loading reset credits..."
+                : "No reset credits reported for this account."}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "240px", overflowY: "auto" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                maxHeight: "240px",
+                overflowY: "auto",
+              }}
+            >
               {credits.map((item, idx) => {
                 const granted = formatResetDatePair(item.granted_at);
                 const expires = formatResetDatePair(item.expires_at);
@@ -107,8 +142,16 @@ export const CodexResetCreditsDialog: React.FC<CodexResetCreditsDialogProps> = (
                       gap: "3px",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 600, fontSize: "9.5px", color: "var(--text-primary)" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        style={{ fontWeight: 600, fontSize: "9.5px", color: "var(--text-primary)" }}
+                      >
                         {item.title || "Rate Limit Reset"}
                       </span>
                       <span
@@ -117,12 +160,16 @@ export const CodexResetCreditsDialog: React.FC<CodexResetCreditsDialogProps> = (
                           fontWeight: 600,
                           padding: "1px 5px",
                           borderRadius: "3px",
-                          background: isAvailable ? "rgba(16, 185, 129, 0.12)" : "rgba(255, 255, 255, 0.05)",
+                          background: isAvailable
+                            ? "rgba(16, 185, 129, 0.12)"
+                            : "rgba(255, 255, 255, 0.05)",
                           color: isAvailable ? "#10b981" : "var(--text-secondary)",
-                          border: "1px solid " + (isAvailable ? "rgba(16, 185, 129, 0.25)" : "var(--border-color)"),
+                          border:
+                            "1px solid " +
+                            (isAvailable ? "rgba(16, 185, 129, 0.25)" : "var(--border-color)"),
                         }}
                       >
-                        {remain && remain !== "N/A" ? remain : (item.status || "available")}
+                        {remain && remain !== "N/A" ? remain : item.status || "available"}
                       </span>
                     </div>
 
@@ -136,12 +183,26 @@ export const CodexResetCreditsDialog: React.FC<CodexResetCreditsDialogProps> = (
                         marginTop: "1px",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <span>Expiry:</span>
-                        <span style={{ color: "var(--text-primary)", textAlign: "right" }}>{expires.local}</span>
+                        <span style={{ color: "var(--text-primary)", textAlign: "right" }}>
+                          {expires.local}
+                        </span>
                       </div>
                       {granted.local && granted.local !== "N/A" && (
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
                           <span>Granted:</span>
                           <span style={{ textAlign: "right" }}>{granted.local}</span>
                         </div>
