@@ -165,6 +165,7 @@ async fn ping_antigravity_maintenance() -> Result<String, String> {
         access_token,
         (!refresh_token.is_empty()).then_some(refresh_token),
         auth_method,
+        None,
     )
     .await
     .map_err(|error| format!("{:?}", error))?;

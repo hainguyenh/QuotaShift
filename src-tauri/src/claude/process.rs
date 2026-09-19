@@ -1,244 +1,244 @@
-//! Process termination for Claude Code CLI, Claude Desktop, and Claude-owned IDE backends.
+//! Claude Code process classification plus account-scoped suspend/resume protection.
 
-use super::ide_process::{is_claude_ide_backend_process, is_ide_host_process};
+mod auto_resume;
+mod classify;
+mod current;
+mod journal;
+mod native;
+
+pub use auto_resume::run_claude_auto_resume_worker;
+pub use classify::{
+    is_claude_agent_process, is_claude_cli_process, is_claude_desktop_process,
+    is_claude_usage_probe, is_target_claude_process,
+};
+pub use current::*;
+pub use journal::restore_claude_suspension_journal;
+
+use classify::{process_category, process_command, resolve_process_profiles};
+use journal::{
+    persist_suspensions, should_keep_suspended_process, suspended_map, with_resume_persistence,
+    with_suspension_persistence, SuspendedAccountRecord, SuspendedProcessRef,
+};
+use native::{is_process_still_suspended, set_process_suspended};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use sysinfo::{ProcessesToUpdate, System};
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use sysinfo::{Pid, System};
+
+use super::accounts::{candidate_dirs, normalize_config_dir_key};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct ClaudeProcessKillResult {
-    pub cli_killed: bool,
-    pub desktop_killed: bool,
-    pub agent_killed: bool,
-    pub ide_backend_killed: bool,
-    pub ide_backend_restarted: bool,
-    pub total_killed: usize,
+pub struct ClaudeProcessSuspendResult {
+    pub cli_suspended: usize,
+    pub desktop_suspended: usize,
+    pub agent_suspended: usize,
+    pub ide_backend_suspended: usize,
+    pub total_suspended: usize,
+    pub already_suspended: usize,
+    pub persistence_error: Option<String>,
 }
 
-fn process_base_name(name: &str) -> String {
-    let lower_name = name.to_ascii_lowercase();
-    std::path::Path::new(&lower_name)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or(&lower_name)
-        .trim_end_matches(".exe")
-        .to_string()
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeProcessResumeResult {
+    pub total_resumed: usize,
+    pub stale_removed: usize,
+    pub persistence_error: Option<String>,
 }
 
-pub fn is_claude_cli_process(name: &str, cmdline: &str) -> bool {
-    let lower_cmd = cmdline.to_ascii_lowercase();
-    let norm_cmd = lower_cmd.replace('\\', "/");
-    let base = process_base_name(name);
-
-    if base == "claude" || base == "claude-code" {
-        return true;
-    }
-    if norm_cmd.contains("@anthropic-ai/claude-code")
-        || norm_cmd.contains("claude-code")
-        || norm_cmd.contains("/claude ")
-        || norm_cmd.ends_with("/claude")
-        || norm_cmd.contains("claude.exe")
-    {
-        return true;
-    }
-    if norm_cmd.split('/').any(|seg| {
-        let clean = seg.trim_matches(|c: char| c == '"' || c == '\'' || c == ',' || c == ';');
-        let tok = clean.trim_end_matches(".exe");
-        tok == "claude" || tok == "claude-code"
-    }) {
-        return true;
-    }
-    lower_cmd.split_whitespace().any(|token| {
-        let clean = token.trim_matches(|c: char| c == '"' || c == '\'' || c == ',' || c == ';');
-        let tok_base = std::path::Path::new(clean)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(clean)
-            .trim_end_matches(".exe");
-        tok_base == "claude" || tok_base == "claude-code"
-    })
+fn live_suspended_for_key(key: &str, system: &System) -> Vec<SuspendedProcessRef> {
+    suspended_map()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(key)
+        .map(|record| record.processes.clone())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|item| {
+            let identity_matches = system
+                .process(Pid::from_u32(item.pid))
+                .is_some_and(|process| item.matches(item.pid, process.start_time()));
+            should_keep_suspended_process(identity_matches, is_process_still_suspended(item.pid))
+        })
+        .collect()
 }
 
-pub fn is_claude_desktop_process(name: &str, cmdline: &str) -> bool {
-    let lower_name = name.to_ascii_lowercase();
-    let lower_cmd = cmdline.to_ascii_lowercase();
-    let base = process_base_name(name);
+pub fn suspended_process_counts_for_configs(config_dirs: &[PathBuf]) -> HashMap<String, usize> {
+    let tracked = {
+        let map = suspended_map()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if map.is_empty() {
+            return HashMap::new();
+        }
+        map.clone()
+    };
 
-    if base == "claude" && (lower_cmd.contains("claude.app") || lower_cmd.contains("anthropic")) {
-        return true;
-    }
-    lower_cmd.contains("claude.app")
-        || lower_cmd.contains("claude desktop")
-        || (lower_name.contains("claude") && lower_cmd.contains("electron"))
-}
-
-pub fn is_claude_agent_process(name: &str, cmdline: &str) -> bool {
-    let lower_cmd = cmdline.to_ascii_lowercase();
-    let base = process_base_name(name);
-    if matches!(
-        base.as_str(),
-        "claude-agent" | "claude-language-server" | "claude-ls" | "claude-lsp"
-    ) {
-        return true;
-    }
-    lower_cmd.contains("claude-agent")
-        || lower_cmd.contains("claude-language-server")
-        || lower_cmd.contains("claude-ls")
-        || lower_cmd.contains("claude-lsp")
-}
-
-pub fn is_target_claude_process(pid: u32, current_pid: u32, name: &str, cmdline: &str) -> bool {
-    if pid == current_pid || pid == 0 {
-        return false;
-    }
-    let lower_name = name.to_ascii_lowercase();
-    let lower_cmd = cmdline.to_ascii_lowercase();
-    if lower_name.contains("quotashift") || lower_cmd.contains("quotashift") {
-        return false;
-    }
-    if is_ide_host_process(name, cmdline) {
-        return false;
-    }
-
-    is_claude_ide_backend_process(name, cmdline)
-        || is_claude_cli_process(name, cmdline)
-        || is_claude_desktop_process(name, cmdline)
-        || is_claude_agent_process(name, cmdline)
-}
-
-fn process_command(process: &sysinfo::Process) -> String {
-    process
-        .cmd()
+    let system = System::new_all();
+    let requested = config_dirs
         .iter()
-        .map(|s| s.to_string_lossy())
-        .collect::<Vec<_>>()
-        .join(" ")
+        .map(|path| normalize_config_dir_key(path))
+        .collect::<HashSet<_>>();
+    let mut counts = HashMap::new();
+    let mut cleaned = tracked;
+
+    cleaned.retain(|key, record| {
+        record.processes.retain(|item| {
+            let identity_matches = system
+                .process(Pid::from_u32(item.pid))
+                .is_some_and(|process| item.matches(item.pid, process.start_time()));
+            should_keep_suspended_process(identity_matches, is_process_still_suspended(item.pid))
+        });
+        if requested.contains(key) && !record.processes.is_empty() {
+            counts.insert(key.clone(), record.processes.len());
+        }
+        !record.processes.is_empty()
+    });
+
+    *suspended_map()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = cleaned;
+    counts
 }
 
 #[tauri::command]
-pub async fn kill_claude_processes() -> Result<ClaudeProcessKillResult, String> {
-    let mut result = ClaudeProcessKillResult::default();
-    let current_pid = std::process::id();
-    let mut killed_ide_pids = HashSet::new();
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::All);
+#[allow(clippy::too_many_arguments)]
+pub async fn suspend_claude_account_processes(
+    app: tauri::AppHandle,
+    config_dir: String,
+    auto_resume: Option<bool>,
+    five_hour_triggered: Option<bool>,
+    five_hour_reset_at: Option<i64>,
+    weekly_triggered: Option<bool>,
+    weekly_reset_at: Option<i64>,
+) -> Result<ClaudeProcessSuspendResult, String> {
+    let target = PathBuf::from(&config_dir);
+    let target_key = normalize_config_dir_key(&target);
+    let home = crate::session::get_home_dir()
+        .ok_or_else(|| "Could not locate the user home directory".to_string())?;
+    let default_config = home.join(".claude");
+    let mut candidates = candidate_dirs().unwrap_or_default();
+    if !candidates
+        .iter()
+        .any(|candidate| normalize_config_dir_key(candidate) == target_key)
+    {
+        candidates.push(target.clone());
+    }
 
-    for (&pid, process) in sys.processes() {
-        let pid_u32 = pid.as_u32();
+    let system = System::new_all();
+    let profiles = resolve_process_profiles(&system, &candidates, &default_config);
+    let existing = live_suspended_for_key(&target_key, &system);
+    let existing_pids = existing.iter().map(|item| item.pid).collect::<HashSet<_>>();
+    let mut result = ClaudeProcessSuspendResult::default();
+    let mut newly_suspended = Vec::new();
+
+    for (&pid, process) in system.processes() {
+        let pid = pid.as_u32();
         let name = process.name().to_string_lossy();
-        let cmd = process_command(process);
-        if !is_target_claude_process(pid_u32, current_pid, &name, &cmd) {
+        let command = process_command(process);
+        if !is_target_claude_process(pid, std::process::id(), &name, &command)
+            || profiles.get(&pid) != Some(&target_key)
+        {
+            continue;
+        }
+        if existing_pids.contains(&pid) {
+            result.already_suspended += 1;
+            continue;
+        }
+        if !set_process_suspended(pid, true) {
             continue;
         }
 
-        let is_ide_backend = is_claude_ide_backend_process(&name, &cmd);
-        let is_desktop = is_claude_desktop_process(&name, &cmd);
-        let is_cli = !is_ide_backend && !is_desktop && is_claude_cli_process(&name, &cmd);
-        let is_agent = !is_ide_backend && is_claude_agent_process(&name, &cmd);
-
-        if process.kill() {
-            result.ide_backend_killed |= is_ide_backend;
-            result.desktop_killed |= is_desktop;
-            result.cli_killed |= is_cli;
-            result.agent_killed |= is_agent;
-            result.total_killed += 1;
-            if is_ide_backend {
-                killed_ide_pids.insert(pid_u32);
-            }
-        }
+        let category = process_category(&name, &command);
+        result.cli_suspended += usize::from(category.cli);
+        result.desktop_suspended += usize::from(category.desktop);
+        result.agent_suspended += usize::from(category.agent);
+        result.ide_backend_suspended += usize::from(category.ide_backend);
+        result.total_suspended += 1;
+        newly_suspended.push(SuspendedProcessRef {
+            pid,
+            start_time: process.start_time(),
+        });
     }
 
-    if result.ide_backend_killed {
-        wait_for_ide_backend_restart(&mut sys, &killed_ide_pids, &mut result).await;
-    } else {
-        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+    if !existing.is_empty() || !newly_suspended.is_empty() {
+        let mut map = suspended_map()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous = map.get(&target_key).cloned();
+        let mut processes = existing;
+        processes.extend(newly_suspended);
+        processes.sort_by_key(|item| (item.pid, item.start_time));
+        processes.dedup();
+
+        let record = SuspendedAccountRecord {
+            config_dir: config_dir.clone(),
+            processes,
+            suspended_at: chrono::Utc::now().timestamp(),
+            auto_resume: auto_resume
+                .or_else(|| previous.as_ref().map(|item| item.auto_resume))
+                .unwrap_or(false),
+            five_hour_triggered: five_hour_triggered
+                .or_else(|| previous.as_ref().map(|item| item.five_hour_triggered))
+                .unwrap_or(false),
+            five_hour_reset_at: five_hour_reset_at
+                .or_else(|| previous.as_ref().and_then(|item| item.five_hour_reset_at)),
+            weekly_triggered: weekly_triggered
+                .or_else(|| previous.as_ref().map(|item| item.weekly_triggered))
+                .unwrap_or(false),
+            weekly_reset_at: weekly_reset_at
+                .or_else(|| previous.as_ref().and_then(|item| item.weekly_reset_at)),
+        };
+        map.insert(target_key, record);
+        drop(map);
+        result = with_suspension_persistence(result, persist_suspensions(&app));
     }
     Ok(result)
 }
 
-async fn wait_for_ide_backend_restart(
-    sys: &mut System,
-    killed_pids: &HashSet<u32>,
-    result: &mut ClaudeProcessKillResult,
-) {
-    // The IDE owns this backend. Never kill the IDE/shared extension host; wait for the
-    // extension to observe the exit and spawn a fresh Claude-owned backend process.
-    for _ in 0..5 {
-        tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
-        sys.refresh_processes(ProcessesToUpdate::All);
-        let restarted = sys.processes().iter().any(|(&pid, process)| {
-            if killed_pids.contains(&pid.as_u32()) {
-                return false;
-            }
-            let name = process.name().to_string_lossy();
-            let cmd = process_command(process);
-            is_claude_ide_backend_process(&name, &cmd)
-        });
-        if restarted {
-            result.ide_backend_restarted = true;
-            break;
+#[tauri::command]
+pub async fn resume_claude_account_processes(
+    app: tauri::AppHandle,
+    config_dir: String,
+) -> Result<ClaudeProcessResumeResult, String> {
+    let key = normalize_config_dir_key(Path::new(&config_dir));
+    let record = suspended_map()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .remove(&key);
+    let Some(record) = record else {
+        return Ok(ClaudeProcessResumeResult::default());
+    };
+
+    let system = System::new_all();
+    let mut result = ClaudeProcessResumeResult::default();
+    let mut retry = Vec::new();
+    let mut record = record;
+    for item in std::mem::take(&mut record.processes) {
+        let Some(process) = system.process(Pid::from_u32(item.pid)) else {
+            result.stale_removed += 1;
+            continue;
+        };
+        if !item.matches(item.pid, process.start_time()) {
+            result.stale_removed += 1;
+        } else if set_process_suspended(item.pid, false) {
+            result.total_resumed += 1;
+        } else {
+            retry.push(item);
         }
     }
+
+    if !retry.is_empty() {
+        record.processes = retry;
+        suspended_map()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(key, record);
+    }
+    result = with_resume_persistence(result, persist_suspensions(&app));
+    Ok(result)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn target_filter_never_matches_current_process_or_quotashift() {
-        assert!(!is_target_claude_process(42, 42, "claude", "claude"));
-        assert!(!is_target_claude_process(
-            43,
-            42,
-            "QuotaShift.exe",
-            "QuotaShift.exe --claude-helper"
-        ));
-    }
-
-    #[test]
-    fn target_filter_matches_cli_agent_and_ide_backend() {
-        assert!(is_target_claude_process(
-            43,
-            42,
-            "node.exe",
-            "node C:/tools/@anthropic-ai/claude-code/cli.js"
-        ));
-        assert!(is_target_claude_process(44, 42, "claude-agent.exe", "claude-agent.exe"));
-        assert!(is_target_claude_process(
-            45,
-            42,
-            "claude.exe",
-            "C:/Users/me/.vscode/extensions/anthropic.claude-code-2.1.181/resources/native-binary/claude.exe --resume abc"
-        ));
-    }
-
-    #[test]
-    fn target_filter_never_matches_ide_host() {
-        assert!(!is_target_claude_process(
-            46,
-            42,
-            "Code.exe",
-            "Code.exe --extensionHost C:/Users/me/.vscode/extensions/anthropic.claude-code/extension.js"
-        ));
-    }
-
-    #[test]
-    fn kill_result_serializes_for_frontend_camel_case_contract() {
-        let value = serde_json::to_value(ClaudeProcessKillResult {
-            cli_killed: true,
-            desktop_killed: false,
-            agent_killed: true,
-            ide_backend_killed: true,
-            ide_backend_restarted: true,
-            total_killed: 3,
-        })
-        .expect("serialize ClaudeProcessKillResult");
-        assert_eq!(value["cliKilled"], true);
-        assert_eq!(value["agentKilled"], true);
-        assert_eq!(value["ideBackendKilled"], true);
-        assert_eq!(value["ideBackendRestarted"], true);
-        assert_eq!(value["totalKilled"], 3);
-    }
-}
+mod tests;

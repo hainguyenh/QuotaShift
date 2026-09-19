@@ -25,6 +25,26 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     }
     antigravity_worker::cleanup_stale_owned_workers();
 
+    let claude_scheduler = app
+        .state::<crate::claude_monitor::ClaudeUsageScheduler>()
+        .inner()
+        .clone();
+    let claude_scheduler_app = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        claude_scheduler.run(claude_scheduler_app).await;
+    });
+
+    if let Err(error) = crate::claude_monitor::restore_claude_suspension_journal(app.handle()) {
+        logger::log_error(
+            "claude_guardrail",
+            &format!("Failed to restore Claude suspension journal: {error}"),
+        );
+    }
+    let claude_resume_app = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        crate::claude_monitor::run_claude_auto_resume_worker(claude_resume_app).await;
+    });
+
     crate::oauth::spawn_codex_client_id_prefetch();
     crate::credential_store::spawn_ag_consumer_credentials_prefetch();
 
@@ -52,8 +72,9 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(border_window) = app.get_webview_window("main") {
             if let Ok(handle) = border_window.window_handle() {
                 if let RawWindowHandle::Win32(h) = handle.as_raw() {
-                    logger::log_info("window", "Removing Windows DWM border");
-                    crate::dwm::remove_border(h.hwnd.get() as *mut std::ffi::c_void);
+                    let hwnd = h.hwnd.get() as *mut std::ffi::c_void;
+                    crate::dwm::remove_border(hwnd);
+                    crate::dwm::prefer_rounded_corners(hwnd);
                 }
             }
         }
@@ -61,9 +82,7 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(overlay_window) = app.get_webview_window("overlay") {
             if let Ok(handle) = overlay_window.window_handle() {
                 if let RawWindowHandle::Win32(h) = handle.as_raw() {
-                    logger::log_info("window", "Removing Windows DWM border on overlay window");
                     crate::dwm::remove_border(h.hwnd.get() as *mut std::ffi::c_void);
-                    logger::log_info("window", "Attaching overlay window screen clamp");
                     crate::overlay_clamp::clamp_overlay_window_to_screen(
                         h.hwnd.get() as *mut std::ffi::c_void
                     );
@@ -74,10 +93,6 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(tooltip_window) = app.get_webview_window("overlay-tooltip") {
             if let Ok(handle) = tooltip_window.window_handle() {
                 if let RawWindowHandle::Win32(h) = handle.as_raw() {
-                    logger::log_info(
-                        "window",
-                        "Removing Windows DWM border on overlay-tooltip window",
-                    );
                     crate::dwm::remove_border(h.hwnd.get() as *mut std::ffi::c_void);
                     crate::dwm::make_window_click_through(h.hwnd.get() as *mut std::ffi::c_void);
                 }
@@ -86,13 +101,12 @@ pub fn init(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(overlay_window) = app.get_webview_window("overlay") {
-        logger::log_info("app", "Configuring overlay window default position");
         if let Ok(Some(monitor)) = overlay_window.primary_monitor() {
             let monitor_size = monitor.size();
             let monitor_pos = monitor.position();
             let scale = monitor.scale_factor();
             let w = (340.0 * scale) as i32;
-            let h = (100.0 * scale) as i32;
+            let h = (80.0 * scale) as i32;
             let pad = (20.0 * scale) as i32;
             let taskbar_h = (50.0 * scale) as i32;
             let x = monitor_pos.x + monitor_size.width as i32 - w - pad;

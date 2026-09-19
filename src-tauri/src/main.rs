@@ -4,7 +4,7 @@
 fn main() {
     if std::env::args().any(|arg| arg == "--claude-statusline-bridge") {
         if let Err(error) = tauri_app_lib::claude_monitor::run_claude_statusline_bridge() {
-            eprintln!("QuotaShift Claude statusLine bridge: {error}");
+            eprintln!("QuotaShift Claude Code statusLine bridge: {error}");
         }
         return;
     }

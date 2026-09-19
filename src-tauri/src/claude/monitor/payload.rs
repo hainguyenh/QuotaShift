@@ -37,7 +37,7 @@ pub fn normalize_payload_value(
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|id| !id.is_empty())
-        .ok_or_else(|| "Claude statusLine payload is missing session_id".to_string())?
+        .ok_or_else(|| "Claude Code statusLine payload is missing session_id".to_string())?
         .to_string();
 
     Ok(ClaudeSessionSnapshot {

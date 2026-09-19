@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use crate::claude_monitor::cli::get_cached_or_trigger_cli_usage;
+use crate::claude_monitor::cli::probe_cli_usage_for_config;
 use crate::claude_monitor::types::{
     ClaudeMonitorSource, ClaudeMonitorStatus, ClaudeObservedUsage, ClaudeSessionSnapshot,
     LocalTranscriptScan,
@@ -25,10 +25,10 @@ pub fn read_snapshot() -> Result<Option<ClaudeSessionSnapshot>, String> {
         return Ok(None);
     }
     let raw = fs::read_to_string(&path)
-        .map_err(|error| format!("Failed to read local Claude session snapshot: {error}"))?;
+        .map_err(|error| format!("Failed to read local Claude Code session snapshot: {error}"))?;
     serde_json::from_str::<ClaudeSessionSnapshot>(&raw)
         .map(Some)
-        .map_err(|error| format!("Local Claude session snapshot is invalid JSON: {error}"))
+        .map_err(|error| format!("Local Claude Code session snapshot is invalid JSON: {error}"))
 }
 
 pub fn read_local_transcript_scan() -> Result<LocalTranscriptScan, String> {
@@ -114,7 +114,7 @@ pub fn monitor_status(
     };
 
     if needs_cli {
-        let (cli_5h, cli_7d) = get_cached_or_trigger_cli_usage(false);
+        let (cli_5h, cli_7d) = probe_cli_usage_for_config(None).unwrap_or((None, None));
         if cli_5h.is_some() || cli_7d.is_some() {
             if let Some(s) = session.as_mut() {
                 if s.five_hour.is_none() {

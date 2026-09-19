@@ -10,6 +10,9 @@ pub use codex_client_id::*;
 pub mod codex;
 pub use codex::*;
 
+pub mod codex_profile;
+pub use codex_profile::*;
+
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 fn ag_consumer_client_id() -> String {

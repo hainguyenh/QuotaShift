@@ -3,9 +3,36 @@ use std::path::PathBuf;
 fn repo_file(path: &str) -> String {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let full_path = manifest.join(path);
-    std::fs::read_to_string(&full_path)
+    let mut content = std::fs::read_to_string(&full_path)
         .unwrap_or_else(|error| panic!("failed to read {}: {}", full_path.display(), error))
-        .replace("\r\n", "\n")
+        .replace("\r\n", "\n");
+    if path.ends_with("App.tsx") {
+        let submodules = [
+            "../src/components/app/AppModals.tsx",
+            "../src/components/app/AppTabBar.tsx",
+            "../src/hooks/useAppCoordinator.ts",
+            "../src/hooks/useAppBackups.ts",
+            "../src/hooks/useCodexModelScanManager.ts",
+            "../src/hooks/useCodexRouterManager.ts",
+            "../src/hooks/useAppAccountOperations.ts",
+            "../src/hooks/useAntigravityAccountOps.ts",
+            "../src/hooks/useCodexAccountOps.ts",
+            "../src/hooks/useCodexUsageFetcher.ts",
+            "../src/hooks/useAppUsageAndOverlay.ts",
+            "../src/hooks/useAppSessionBootstrap.ts",
+            "../src/hooks/useAppUpdateCheck.ts",
+            "../src/hooks/useAppEventListeners.ts",
+            "../src/utils/common/app-overlay-helpers.ts",
+        ];
+        for sub in submodules {
+            let sub_path = manifest.join(sub);
+            if let Ok(sub_content) = std::fs::read_to_string(&sub_path) {
+                content.push('\n');
+                content.push_str(&sub_content.replace("\r\n", "\n"));
+            }
+        }
+    }
+    content
 }
 
 fn source_slice<'a>(source: &'a str, start: &str, end: &str) -> &'a str {

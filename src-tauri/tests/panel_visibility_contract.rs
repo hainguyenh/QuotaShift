@@ -8,34 +8,39 @@ fn repo_file(path: &str) -> String {
 }
 
 #[test]
-fn tray_panel_show_is_guarded_from_immediate_focus_loss() {
+fn main_window_uses_normal_desktop_lifecycle() {
     let lib = repo_file("src/lib.rs");
+    let manager = repo_file("src/window/window_manager.rs");
 
     assert!(
-        lib.contains("PANEL_FOCUS_GUARD_MS"),
-        "tray panel needs a short activation guard on Windows"
+        lib.contains("Open QuotaShift window"),
+        "tray menu must describe opening the normal application window"
     );
     assert!(
-        lib.contains("arm_panel_focus_guard"),
-        "every panel show path must arm the activation guard"
+        manager.contains("pub fn open_main_window"),
+        "normal window lifecycle needs one shared open path"
     );
     assert!(
-        lib.contains("should_hide_panel_on_focus_loss"),
-        "focus-loss auto-hide must consult the activation guard"
+        manager.contains("window.unminimize()") && manager.contains("window.set_focus()"),
+        "opening from tray or second instance must restore and focus the window"
     );
     assert!(
-        lib.contains("if should_hide_panel_on_focus_loss()")
-            || lib.contains("if !should_hide_panel_on_focus_loss()"),
-        "Focused(false) must not unconditionally hide a freshly shown panel"
+        !lib.contains("PANEL_FOCUS_GUARD_MS") && !lib.contains("should_hide_panel_on_focus_loss"),
+        "normal desktop window must not retain tray-panel focus-loss guards"
     );
 }
 
 #[test]
-fn left_click_does_not_open_native_tray_menu() {
+fn close_hides_to_tray_and_left_click_does_not_open_native_menu() {
     let lib = repo_file("src/lib.rs");
 
     assert!(
+        lib.contains("WindowEvent::CloseRequested")
+            && lib.contains("hide_main_window(&main_app, \"window_close\")"),
+        "window close should hide to tray instead of exiting"
+    );
+    assert!(
         lib.contains(".show_menu_on_left_click(false)"),
-        "left-click must be reserved for the quota panel; the native tray menu should remain right-click only"
+        "left-click remains reserved for opening the QuotaShift window; tray menu stays right-click only"
     );
 }

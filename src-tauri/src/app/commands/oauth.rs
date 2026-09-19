@@ -16,11 +16,38 @@ pub async fn fetch_chatgpt_workspaces(access_token: String) -> Result<serde_json
 }
 
 #[tauri::command]
+pub async fn fetch_chatgpt_profile(access_token: String) -> Result<serde_json::Value, String> {
+    oauth::fetch_chatgpt_profile(access_token).await
+}
+
+#[tauri::command]
 pub async fn fetch_chatgpt_usage(
     access_token: String,
     account_id: String,
 ) -> Result<serde_json::Value, String> {
-    oauth::fetch_chatgpt_usage(access_token, Some(account_id)).await
+    let aid = if account_id.is_empty() || account_id == "shared-local-session" {
+        None
+    } else {
+        Some(account_id)
+    };
+    let mut usage = oauth::fetch_chatgpt_usage(access_token.clone(), aid.clone()).await?;
+
+    // Reset credits are supplemental: never fail normal quota refresh when this
+    // endpoint is unavailable for a plan/account.
+    if let Ok(reset_credits) =
+        oauth::fetch_chatgpt_rate_limit_reset_credits(access_token, aid).await
+    {
+        if let Some(root) = usage.as_object_mut() {
+            let rate_limit = root
+                .entry("rate_limit")
+                .or_insert_with(|| serde_json::json!({}));
+            if let Some(rate_limit) = rate_limit.as_object_mut() {
+                rate_limit.insert("reset_credits".to_string(), reset_credits);
+            }
+        }
+    }
+
+    Ok(usage)
 }
 
 #[tauri::command]

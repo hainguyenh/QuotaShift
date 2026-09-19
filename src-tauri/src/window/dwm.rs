@@ -1,8 +1,5 @@
 #[cfg(target_os = "windows")]
-pub fn remove_border(hwnd: *mut std::ffi::c_void) {
-    const DWMWA_BORDER_COLOR: u32 = 34;
-    const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
-
+fn set_dwm_attribute(hwnd: *mut std::ffi::c_void, attribute: u32, value: &u32) -> i32 {
     #[link(name = "dwmapi")]
     unsafe extern "system" {
         fn DwmSetWindowAttribute(
@@ -13,19 +10,40 @@ pub fn remove_border(hwnd: *mut std::ffi::c_void) {
         ) -> i32;
     }
 
-    let color = DWMWA_COLOR_NONE;
     unsafe {
-        let hr = DwmSetWindowAttribute(
+        DwmSetWindowAttribute(
             hwnd,
-            DWMWA_BORDER_COLOR,
-            &color as *const u32 as *const std::ffi::c_void,
+            attribute,
+            value as *const u32 as *const std::ffi::c_void,
             std::mem::size_of::<u32>() as u32,
+        )
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn remove_border(hwnd: *mut std::ffi::c_void) {
+    const DWMWA_BORDER_COLOR: u32 = 34;
+    const DWMWA_COLOR_NONE: u32 = 0xFFFF_FFFE;
+    let hr = set_dwm_attribute(hwnd, DWMWA_BORDER_COLOR, &DWMWA_COLOR_NONE);
+    if hr < 0 {
+        crate::logger::log_warn(
+            "dwm",
+            &format!("Failed to remove DWM border: HRESULT={:#x}", hr as u32),
         );
-        crate::logger::log_info(
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn prefer_rounded_corners(hwnd: *mut std::ffi::c_void) {
+    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const DWMWCP_ROUND: u32 = 2;
+    let hr = set_dwm_attribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &DWMWCP_ROUND);
+    if hr < 0 {
+        crate::logger::log_warn(
             "dwm",
             &format!(
-                "DwmSetWindowAttribute remove_border result: HRESULT={:#x}",
-                hr
+                "Failed to request rounded window corners: HRESULT={:#x}",
+                hr as u32
             ),
         );
     }
@@ -47,9 +65,5 @@ pub fn make_window_click_through(hwnd: *mut std::ffi::c_void) {
         let cur = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         let updated = cur | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT;
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
-        crate::logger::log_info(
-            "dwm",
-            "Configured overlay tooltip window as non-activating and transparent",
-        );
     }
 }

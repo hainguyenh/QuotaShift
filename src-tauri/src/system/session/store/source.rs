@@ -113,7 +113,10 @@ mod tests {
             ide_executable: None,
         };
         let mut empty_cli = source("", 50.0);
-        empty_cli.insert("antigravity.refreshToken".to_string(), json!("refresh-only"));
+        empty_cli.insert(
+            "antigravity.refreshToken".to_string(),
+            json!("refresh-only"),
+        );
 
         let selected = select_antigravity_session_map(
             &runtime,

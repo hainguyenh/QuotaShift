@@ -130,7 +130,11 @@ fn classify_cmdline(cmd_line: &str) -> Option<ProcessKind> {
         Some(ProcessKind::Ide)
     } else if lower.contains("--app_data_dir") && lower.contains("antigravity") {
         Some(ProcessKind::App)
-    } else if (lower.contains("antigravity-cli") || lower.contains("antigravity_cli") || lower.contains("agy")) && lower.contains("--csrf") {
+    } else if (lower.contains("antigravity-cli")
+        || lower.contains("antigravity_cli")
+        || lower.contains("agy"))
+        && lower.contains("--csrf")
+    {
         Some(ProcessKind::Cli)
     } else if lower.contains("language_server") {
         Some(ProcessKind::Ide)

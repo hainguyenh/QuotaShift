@@ -1,21 +1,7 @@
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::OnceLock;
-use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::types::FullStatus;
 use crate::{get_state, logger};
-
-static PANEL_CLOCK: OnceLock<Instant> = OnceLock::new();
-pub static LAST_SHOWN_TIMESTAMP_MS: AtomicI64 = AtomicI64::new(0);
-
-pub fn panel_clock_ms() -> u64 {
-    PANEL_CLOCK
-        .get_or_init(Instant::now)
-        .elapsed()
-        .as_millis()
-        .min(u64::MAX as u128) as u64
-}
 
 pub fn format_tooltip(status: &FullStatus) -> String {
     if let Some(codex) = &status.monitored_codex {
@@ -118,9 +104,12 @@ pub async fn poll_and_update_tray(app_handle: &tauri::AppHandle) -> Result<(), S
             };
             let _ = app_handle.emit("status-updated", &status);
             if let Some(tray) = app_handle.tray_by_id("main") {
-                let _ = tray.set_tooltip(Some(
-                    "QuotaShift: offline\n⚠️ Language server not reachable.".to_string(),
-                ));
+                let tooltip = if status.monitored_codex.is_some() {
+                    format_tooltip(&status)
+                } else {
+                    "QuotaShift: offline\n⚠️ Language server not reachable.".to_string()
+                };
+                let _ = tray.set_tooltip(Some(tooltip));
             }
             Err("Offline".to_string())
         }
@@ -152,92 +141,41 @@ pub fn update_tray_only(app_handle: &tauri::AppHandle) {
     }
 }
 
-pub fn position_window(window: &tauri::WebviewWindow) {
-    logger::log_info("window", "position_window: calculating window position...");
-    let primary_res = window.primary_monitor();
-    let current_res = window.current_monitor();
-
-    let monitor = match primary_res {
-        Ok(Some(m)) => {
-            logger::log_info("window", "Using primary monitor for positioning");
-            Some(m)
-        }
-        Ok(None) => {
-            logger::log_warn(
-                "window",
-                "primary_monitor returned None, falling back to current_monitor",
-            );
-            current_res.ok().flatten()
-        }
-        Err(e) => {
-            logger::log_error(
-                "window",
-                &format!("Failed to retrieve primary_monitor: {}, falling back", e),
-            );
-            current_res.ok().flatten()
-        }
-    };
-
-    if let Some(monitor) = monitor {
-        let monitor_size = monitor.size();
-        let monitor_pos = monitor.position();
-        let scale_factor = monitor.scale_factor();
-
-        let win_w = (680.0 * scale_factor) as i32;
-        let win_h = (760.0 * scale_factor) as i32;
-        let padding = (12.0 * scale_factor) as i32;
-        let taskbar_h = (48.0 * scale_factor) as i32;
-
-        let x = monitor_pos.x + monitor_size.width as i32 - win_w - padding;
-        let y = monitor_pos.y + monitor_size.height as i32 - win_h - taskbar_h - padding;
-
-        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
-    } else {
-        logger::log_error(
-            "window",
-            "position_window: No monitor available to position window!",
-        );
-    }
-}
-
-pub fn show_main_dashboard(app: &AppHandle, source: &str) {
-    logger::log_info(
-        "window",
-        &format!("show_main_dashboard requested by '{}'", source),
-    );
+pub fn open_main_window(app: &AppHandle, _source: &str) {
     if let Some(window) = app.get_webview_window("main") {
-        position_window(&window);
-        crate::arm_panel_focus_guard();
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
         let _ = window.emit("window-shown", true);
-        LAST_SHOWN_TIMESTAMP_MS.store(chrono::Utc::now().timestamp_millis(), Ordering::SeqCst);
     } else {
         logger::log_error(
             "window",
-            "show_main_dashboard: WebviewWindow 'main' not found!",
+            "open_main_window: WebviewWindow 'main' not found!",
         );
     }
 }
 
-pub fn toggle_main_dashboard(app: &AppHandle, source: &str) {
-    logger::log_info(
-        "window",
-        &format!("toggle_main_dashboard requested by '{}'", source),
-    );
+pub fn hide_main_window(app: &AppHandle, _source: &str) {
     if let Some(window) = app.get_webview_window("main") {
-        let is_visible = window.is_visible().unwrap_or(false);
-        if is_visible {
-            let _ = window.hide();
-        } else {
-            show_main_dashboard(app, source);
-        }
+        let _ = window.hide();
     } else {
         logger::log_error(
             "window",
-            "toggle_main_dashboard: WebviewWindow 'main' not found!",
+            "hide_main_window: WebviewWindow 'main' not found!",
         );
     }
+}
+
+pub fn quit_application(app: &AppHandle, source: &str) {
+    logger::log_info(
+        "app",
+        &format!("quit_application requested by '{}'", source),
+    );
+    let router = app.state::<crate::codex_router::CodexRouterManager>();
+    let _ = tauri::async_runtime::block_on(router.stop_listener());
+    let manager = app.state::<crate::antigravity_worker::AntigravityWorkerManager>();
+    let _ = manager.stop_all();
+    app.exit(0);
 }
 
 pub fn restore_router_config_on_exit(source: &str) {
