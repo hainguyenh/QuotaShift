@@ -31,63 +31,35 @@ QuotaShift is a desktop application built with Tauri that tracks quota limits, r
 
 ### Desktop overlay
 
-- Compact HUD for the tracked Antigravity, ChatGPT Codex, or Claude Code account with usage percentages and reset information.
-- Glassmorphism and Mono overlay themes, both synchronized with the app light/dark theme where applicable.
-- UI scale can be adjusted from 80% to 200%.
-- Edge clamping on Windows keeps the overlay within screen bounds across multiple monitors.
-- Right-click menu provides Refresh Usage, Open Dashboard, light/dark theme toggle, and Hide Overlay actions.
-- Hover tooltips expose full usage/reset details while keeping the overlay compact.
+- Compact HUD for Antigravity, ChatGPT Codex, and Claude Code with usage and reset details.
+- Glassmorphism and Mono themes, 80%–200% scaling, and multi-monitor edge clamping.
+- Right-click actions for refresh, dashboard, theme toggle, and hide; hover tooltips show full details.
 
 ### Google Antigravity
 
-- Track 5-hour and weekly quota pools with absolute reset times.
-- Inspect quotas through background language server workers without locking the active IDE session.
-- Detect unsaved IDE sessions with a pinned card and capture them in one click.
-- Switch accounts by updating local IDE credentials, refreshing OAuth tokens before writing, and restarting processes cleanly.
-- Pick the account with the most remaining quota using the Best button.
-- Background keep-alive loop refreshes OAuth access tokens to prevent session expiration.
-- Drag and drop account cards to save a custom order. The right-most account-bar Sort menu can also persist Alias, Email, Tier, normalized Usage, or Last used order in either Asc or Desc direction.
+- Monitor 5-hour and weekly quotas with reset times through background workers.
+- Capture unsaved IDE sessions, switch accounts safely, and pick the account with the most quota remaining.
+- OAuth keep-alive plus persistent drag-and-drop or Sort-menu account ordering.
 
 ### ChatGPT Codex
 
-- Monitor Free, Plus, Pro, and Team accounts with primary and weekly usage windows.
-- Local loopback proxy router (`127.0.0.1:0`) with random 32-byte bearer tokens from `OsRng`.
-- Query model availability across saved accounts to find shared model support.
-- Group accounts into routing pools with automatic failover when limits are reached.
-- Sync provider settings in `config.toml` with automatic restore on exit, tray quit, or crash recovery.
-- Process manager stops active Codex CLI, ChatGPT desktop, and extension processes before credential switches.
-- Drag cards or use the right-most Sort menu to persist Codex account order across launches.
+- Monitor saved accounts and their available usage windows.
+- Discover shared model support and group accounts into local routing pools with automatic failover.
+- Switch credentials safely, restore provider config on exit, and persist account order by drag or Sort menu.
 
 ### Claude Code
 
-- Monitor multiple Claude Code subscription profiles keyed by their `CLAUDE_CONFIG_DIR` directories without switching credentials.
-- Automatically discover local profiles and optionally add additional profile directories manually.
-- Track 5-hour and weekly usage per profile, with cached polling and account-specific desktop-overlay tracking.
-- Shared account search matches Claude Code email, organization, profile name, config path, subscription type, and rate-limit tier.
-- Claude Code account cards support target-only manual usage refresh. While Claude is visible, active/tracked profiles can use their faster cadence and every other profile—including inactive, untracked, non-processing, or process-suspended profiles—continues usage refresh on the Other idle accounts poll rate. Hiding the Claude platform is the hard stop for Claude polling, guardrails, refresh work, and auto-resume runtime.
-- Resolve the currently running Claude Code profile and monitor that account directly.
-- Drag Claude profile cards to reorder them like the other provider tabs; the order persists across launches, and the shared Sort menu supports Alias, Email, Tier, normalized Usage, and Last used in Asc or Desc order.
-- Optional guardrails use independent 5-hour and weekly thresholds with an adaptive dedicated poll rate.
-- Guardrails are one-shot: after QuotaShift successfully suspends the Claude Code processes mapped to the triggered profile, both guardrail switches turn off and must be enabled or configured again if needed.
-- A successful guardrail suspension shows both an in-app warning and a native operating-system notification. Manual Resume remains the default recovery path.
-- Optional `Auto-resume at quota reset` is off by default. When enabled, QuotaShift persists only the suspended process identity and reset metadata, and resumes only the same PID + process start-time + profile after every triggered quota window has reset.
-- If a required reset time is missing, or quota data is stale, unknown, or errored, QuotaShift keeps the process suspended instead of treating that state as safe to resume.
-- Local telemetry support for Claude Code `statusLine` and project transcripts remains available without storing Claude credentials or running a proxy.
+- Monitor multiple `CLAUDE_CONFIG_DIR` profiles without switching credentials.
+- Auto-discover profiles, add custom directories, search accounts, refresh usage, and track a profile in the desktop overlay.
+- Optional independent 5-hour and weekly guardrails can suspend matching Claude processes, notify the user, and optionally auto-resume after all required resets.
+- Local `statusLine` and transcript telemetry remain available without storing Claude credentials or running a proxy.
 
 ### Dashboard and backups
 
-- Applying a saved Antigravity or Codex account immediately updates its Last used time. On startup and each idle-account poll cycle, QuotaShift also reconciles the current local Antigravity/Codex session and updates Last used for the matching saved account.
-
-- Search accounts in real time across Antigravity, ChatGPT Codex, and Claude Code.
-- Responsive account-card grids add more cards per row as viewport width increases, while compact and expanded card modes remain available.
-- Main-window zoom is persisted across restarts and supports 70%–190% in 10% steps with Ctrl + Plus/Minus, Ctrl + 0, or Ctrl + mouse wheel.
-- Settings are organized into Monitoring, Appearance, Keyboard Shortcuts, Data, Overlay, Logs, and Help sections in a stable-height modal that stays below the interactive app title bar.
-- Export and import accounts using AES-256-GCM passphrase-encrypted backups; a wrong import passphrase is shown inline in red under the passphrase field instead of as a toast.
-- Reveal exported backups directly in Windows Explorer, macOS Finder, or Linux file managers.
-- Set custom poll intervals for tracked and idle accounts.
-- Confirmation modals protect against accidental account deletion or process termination.
-- Minimize to the system tray with live usage tooltips.
-- Settings → Help includes a copyable, installed-version-aware AI-support prompt. It prefers the exact tagged `v{version}/llm.txt`, uses [`llm.txt`](llm.txt) + changelog only as fallback context, and includes author/source/Issues links plus a quick issue-report template.
+- Search all providers, use responsive compact/expanded card layouts, and persist main-window zoom.
+- Configure monitoring, appearance, shortcuts, overlay, logs, help, and tracked/idle poll rates from Settings.
+- Export/import AES-256-GCM encrypted backups and reveal them in the native file manager.
+- Last-used tracking, confirmation dialogs, tray usage tooltips, and installed-version-aware AI support are built in.
 
 ---
 
