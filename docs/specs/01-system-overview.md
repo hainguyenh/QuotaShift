@@ -1,6 +1,6 @@
 # 01 — System Overview
 
-**Audience:** engineers & AI agents · **Verified against:** `1.1.2` · **Date:** 2026-09-24
+**Audience:** engineers & AI agents · **Verified against:** `1.1.3` · **Date:** 2026-09-27
 
 QuotaShift is a cross-platform Tauri desktop application for monitoring AI-provider quota, switching supported provider accounts, routing OpenAI Codex model traffic through local account pools, and supervising Claude Code quota guardrails. Claude Code credentials remain monitor-only.
 
@@ -28,8 +28,8 @@ QuotaShift is a cross-platform Tauri desktop application for monitoring AI-provi
 | Area | Primary source | Responsibility |
 | --- | --- | --- |
 | App orchestration | `src/App.tsx`, `src/hooks/app/useAppCoordinator.ts` | Provider state, session bootstrap, refresh, dialogs, tracked provider |
-| Antigravity | `src/components/antigravity/`, `src/utils/antigravity/`, `src-tauri/src/antigravity/` | Quota retrieval, account apply, local-session integration |
-| Codex | `src/components/codex/`, `src/utils/codex/`, `src-tauri/src/codex/` | Account usage, model discovery, pools, loopback routing, config sync |
+| Antigravity | `src/components/antigravity/`, `src/utils/antigravity/`, `src-tauri/src/antigravity/` | Quota retrieval, account apply, local-session integration, keep-alive |
+| Codex | `src/components/codex/`, `src/utils/codex/`, `src-tauri/src/codex/` | Account usage, model discovery, pools, loopback routing, config sync, multi-account keep-alive |
 | Claude Code | `src/components/claude/`, `src/utils/claude/`, `src-tauri/src/claude/` | Multi-profile monitoring, polling, guardrails, suspend/resume |
 | Secure storage | `src/utils/auth/secure-storage*`, `src-tauri/src/storage/secure_storage*` | Synchronous renderer facade over authenticated encrypted persistence |
 | Desktop shell | `src/components/common/Header.tsx`, `WindowControls.tsx`, `WindowResizeHandles.tsx` | Borderless title bar, window actions, search, Settings |
@@ -45,9 +45,10 @@ QuotaShift is a cross-platform Tauri desktop application for monitoring AI-provi
 5. **Tracked tray/overlay state follows the explicitly monitored provider/account.** Unrelated idle polling must not overwrite it.
 6. **Usage severity is global.** Remaining quota below 20% is warning orange; below 10% is critical red.
 7. **All modal/dialog surfaces preserve the application title bar.** They begin below the 38px title bar and are viewport-capped for native WebView zoom.
+8. **Keep-alive maintains all registered accounts across Antigravity and Codex.** Background maintenance refreshes near-expired credentials, preserves rotated refresh tokens, and self-heals 401 Unauthorized states.
 
 ## Version alignment
 
-v1.1.2 is aligned across `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`.
+v1.1.3 is aligned across `package.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`.
 
 **Next →** [02 — Security and Credentials](02-security-and-credentials.md)

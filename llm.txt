@@ -1,5 +1,5 @@
 QuotaShift — AI Support Guide
-Guide verified against app version: 1.1.2
+Guide verified against app version: 1.1.3
 Repository: https://github.com/the-long-ride/QuotaShift
 Author: https://github.com/the-long-ride
 Issues: https://github.com/the-long-ride/QuotaShift/issues
@@ -26,6 +26,14 @@ Version resolution protocol for AI assistants:
 Release maintenance rule:
 - Every tagged QuotaShift release should contain the llm.txt that matches that release.
 - main/llm.txt represents current repository behavior and may be newer than an installed release.
+
+V1.1.3 CODEX KEEP-ALIVE, BACKUP PRESERVATION & INSTALLER DEFAULTS
+- Multi-account Codex keep-alive monitors and maintains all saved Codex accounts in the background.
+- Captures rotated refresh tokens and performs self-healing refresh on 401 Unauthorized errors.
+- Syncs active CLI session (~/.codex/auth.json) automatically when the active account refreshes.
+- Backup export and merge restore strictly preserve refreshToken for both Antigravity and Codex OAuth accounts.
+- Windows installer defaults: shortcut unchecked, start on Windows startup checked.
+- Re-authentication flow displays target account header and highlights active re-auth row.
 
 V1.1.2 CAPTURE AND OVERLAY CHANGES
 - Antigravity Add Account can import distinct saved identities from Antigravity 2.0, agy, and older IDE profiles without applying them.

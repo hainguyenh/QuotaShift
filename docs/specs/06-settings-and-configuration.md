@@ -1,6 +1,6 @@
 # 06 — Settings and Configuration
 
-**Audience:** engineers & AI agents · **Verified against:** `1.1.2` · **Date:** 2026-09-24
+**Audience:** engineers & AI agents · **Verified against:** `1.1.3` · **Date:** 2026-09-27
 
 Settings uses a vertical seven-section navigation: Monitoring, Appearance, Keyboard Shortcuts, Data, Overlay, Logs, and Help.
 
@@ -22,7 +22,7 @@ Settings uses a vertical seven-section navigation: Monitoring, Appearance, Keybo
 | Theme | `antigravity-theme` | dark |
 | Card layout | `quotashift_card_layout_mode` | expanded unless compact explicitly stored |
 | Platform visibility | `quotashift_platform_visibility_v1` | all three providers visible |
-| Antigravity and local Codex keep-alive | `keepAliveActive` | true |
+| Antigravity and multi-account Codex keep-alive | `keepAliveActive` | true |
 | Main WebView zoom | `quotashift_main_webview_zoom_v1` | 100%; 70–190% |
 | Overlay UI | `quotashift_ui_adjustment_v1` | glassmorphism, 100%; scale 80–200% |
 

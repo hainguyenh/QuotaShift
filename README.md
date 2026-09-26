@@ -45,7 +45,7 @@ QuotaShift is a desktop application built with Tauri that tracks quota limits, r
 
 - Monitor saved accounts and their available usage windows.
 - Discover shared model support and group accounts into local routing pools with automatic failover.
-- Switch credentials safely, restore provider config on exit, and persist account order by drag or Sort menu.
+- Switch credentials safely, multi-account OAuth keep-alive with token rotation, restore provider config on exit, and persist account order by drag or Sort menu.
 
 ### Claude Code
 

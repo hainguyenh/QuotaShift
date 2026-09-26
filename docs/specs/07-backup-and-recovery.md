@@ -1,6 +1,6 @@
 # 07 — Backup and Recovery
 
-**Audience:** engineers & AI agents · **Verified against:** `1.1.2` · **Date:** 2026-09-24
+**Audience:** engineers & AI agents · **Verified against:** `1.1.3` · **Date:** 2026-09-27
 
 QuotaShift exports a user-selected passphrase-encrypted backup for portable account recovery. This backup path is distinct from the native OS-keyring-backed runtime secure store.
 
@@ -9,8 +9,8 @@ QuotaShift exports a user-selected passphrase-encrypted backup for portable acco
 `buildBackupData` produces logical payload version **2** containing:
 
 - creation timestamp and current theme;
-- Antigravity account records;
-- Codex account records;
+- Antigravity account records (preserving refresh tokens, session keys, and quotas);
+- Codex account records (preserving OAuth access tokens, refresh tokens, plan types, and rate limits for seamless background keep-alive upon restore);
 - Codex pool definitions.
 
 Claude credentials/profiles are not exported because Claude authentication remains owned by local Claude configuration directories.
@@ -36,7 +36,7 @@ The importer accepts current structured backups plus legacy layouts used by earl
 ### Merge rules
 
 - Existing accounts are matched primarily by stable ID or normalized email, with credential-key fallback for legacy records lacking identity.
-- A matching imported account updates the existing record while preserving the current local ID.
+- A matching imported account updates the existing record while preserving the current local ID and non-empty `refreshToken` values.
 - New records are assigned/import their IDs and are appended.
 - Imported account IDs are remapped before restoring pool membership.
 - Imported pools are normalized, merged by pool ID, then reconciled against the final Codex account set so dangling member IDs are removed.

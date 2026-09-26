@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-09-27
+
+### Added
+
+- **Multi-account Codex keep-alive**: background keep-alive now monitors and maintains all saved Codex accounts in the registry, automatically executing token refresh near expiry, handling token rotation (new access token + rotated refresh token), self-healing on 401 Unauthorized responses, syncing active CLI auth (`~/.codex/auth.json`), and supporting OpenAI API key health checks.
+- **Windows installer autostart default**: added "Start QuotaShift when Windows starts" checkbox to the NSIS installer (checked by default) and set the desktop shortcut creation checkbox to unchecked by default.
+- **Re-authentication flow UX**: displayed target account header and highlighted active re-authentication account row during re-authentication flows across providers.
+
+### Changed
+
+- **Backup and restore token preservation**: account exports and merge restores now strictly preserve `refreshToken` for both Google Antigravity and OpenAI Codex OAuth accounts, preventing restored accounts from losing background keep-alive capabilities.
+- **Test coverage hardening**: added comprehensive test suites for Codex keep-alive bridge and Codex operations, bringing overall line coverage to >97%.
+- Aligned the frontend, Rust, lockfile, Tauri, support guide, and engineering specifications to **1.1.3**.
+
+### Fixed
+
+- **Codex token refresh rotation**: securely captures and persists rotated refresh tokens from OAuth token refresh responses, preventing session invalidation during continuous background maintenance.
+- **Codex 401 recovery**: automatically attempts token refresh recovery upon encountering 401 Unauthorized errors during usage checks.
+
 ## [1.1.2] - 2026-09-24
 
 ### Added

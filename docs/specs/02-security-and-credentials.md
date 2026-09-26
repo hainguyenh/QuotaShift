@@ -1,6 +1,6 @@
 # 02 — Security and Credentials
 
-**Audience:** engineers & AI agents · **Verified against:** `1.1.2` · **Date:** 2026-09-24
+**Audience:** engineers & AI agents · **Verified against:** `1.1.3` · **Date:** 2026-09-27
 
 ## 1. QuotaShift secure account storage
 
@@ -31,14 +31,19 @@ Sensitive QuotaShift account state is not persisted as plaintext browser storage
 ### Antigravity
 
 - OAuth/session credentials can be refreshed and applied because account switching is a supported QuotaShift feature.
+- Multi-account keep-alive maintains all registered Antigravity accounts in the background.
 - Capture reads the provider's shared OS-keyring session and each older IDE profile without changing either source. Matching email or credentials prevent a second saved copy of the same account; existing saved credentials are retained.
 - SQLite session-writing helpers receive credential payloads through JSON stdin. Credential values are not placed on subprocess command lines.
+- Re-authentication flow displays the target account header and highlights the re-authentication account row to prevent misdirected credential updates.
 
 ### OpenAI Codex
 
 - OAuth or API-key account material is stored through the secure account store.
+- Multi-account keep-alive maintains all saved Codex accounts, executing token refresh near expiry, persisting rotated refresh tokens, and self-healing 401 Unauthorized responses.
+- Active CLI configuration (`~/.codex/auth.json`) is synchronized automatically whenever the active account refreshes.
 - Pool routing refreshes expiring OAuth credentials before building router snapshots and persists refreshed account material through secure storage.
 - Pool definitions, usage/model caches, selected pool IDs, and routing flags are non-secret state and are stored separately.
+- Re-authentication modal displays target account header and preserves existing account configuration.
 
 ### Claude Code
 
@@ -63,6 +68,7 @@ User-exported backups use a separate passphrase-based envelope:
 - AES-256-GCM with 12-byte random IV.
 - Wrong passphrase or tampered ciphertext fails decryption.
 - The backup passphrase itself is not stored in the backup.
+- Backups explicitly preserve `refreshToken` for Antigravity and Codex OAuth credentials so restored accounts remain authenticated.
 
 ## 5. Dependency security exception
 

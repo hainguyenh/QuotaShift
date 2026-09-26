@@ -1,6 +1,6 @@
 # 03 — Provider Monitoring and Switching
 
-**Audience:** engineers & AI agents · **Verified against:** `1.1.2` · **Date:** 2026-09-24
+**Audience:** engineers & AI agents · **Verified against:** `1.1.3` · **Date:** 2026-09-27
 
 ## Provider capability matrix
 
@@ -29,6 +29,7 @@
 - Quota is obtained through cloud/API paths and isolated local worker/session paths.
 - Usage is grouped into provider/model pools and normalized into 5-hour/weekly display data.
 - Successful refresh logging is one concise masked-account summary. Routine successful low-level HTTP lines are omitted; failures remain diagnostic.
+- Multi-account keep-alive regularly verifies quota and maintains fresh OAuth sessions for all saved Antigravity accounts.
 
 ### Apply
 
@@ -39,6 +40,15 @@ Applying an Antigravity account refreshes usable OAuth state, updates the suppor
 Add Account reads the shared Antigravity 2.0/agy session and older IDE SQLite profiles, then imports distinct identities into the saved list without applying them. The capture label is optional; the account name or email supplies a fallback. Matching saved accounts are reported as already present, and existing saved credentials are retained.
 
 ## 2. OpenAI Codex
+
+### Multi-account keep-alive
+
+- The background keep-alive daemon (`src-tauri/src/codex/keep_alive/`) monitors and maintains all saved Codex accounts, not only the currently active account.
+- Periodically checks token expiration (within 5 minutes of expiry) and requests updated OAuth tokens using the saved `refreshToken`.
+- Captures and persists rotated refresh tokens from OAuth token refresh responses, preventing session invalidation during long-running background execution.
+- Implements self-healing for `401 Unauthorized` responses by immediately attempting token refresh recovery.
+- If the refreshed account is the currently active Codex account, updates `~/.codex/auth.json` to keep CLI terminal sessions in sync.
+- Supports periodic OpenAI API key health verification for non-OAuth accounts.
 
 ### Account usage and persistence
 
@@ -54,7 +64,7 @@ Add Account reads the shared Antigravity 2.0/agy session and older IDE SQLite pr
 
 A pool contains `id`, `name`, target `model`, member account IDs, and a model-selection mode (`manual` or `discovered`). Pool definitions are normalized and duplicate member IDs are removed.
 
-Pool card behavior in v1.1.2:
+Pool card behavior in v1.1.3:
 
 - Square 32px avatar with the pool initial.
 - Conditional auth composition: only nonzero `OAuth: n` and `API Key: n` parts are shown; an empty pool shows `Pool empty`.
